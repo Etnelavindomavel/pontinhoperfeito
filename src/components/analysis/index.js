@@ -1,0 +1,12 @@
+// Exportações centralizadas dos componentes de análise
+export { default as KPICard } from './KPICard'
+export { default as DataTable } from './DataTable'
+export { default as ChartCard } from './ChartCard'
+export { default as StatGrid } from './StatGrid'
+export { default as EmptyState } from './EmptyState'
+export { default as Section } from './Section'
+export { default as FaturamentoAnalysis } from './FaturamentoAnalysis'
+export { default as EstoqueAnalysis } from './EstoqueAnalysis'
+export { default as EquipeAnalysis } from './EquipeAnalysis'
+export { default as LayoutAnalysis } from './LayoutAnalysis'
+export { default as MarketingAnalysis } from './MarketingAnalysis'
