@@ -35,3 +35,9 @@ dist-ssr
 build
 .cache
 .vercel
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+ai-code-tracking.db
