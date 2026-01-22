@@ -11,7 +11,7 @@ import {
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { dataService } from '../services/dataService'
-import { useAuth } from './AuthContext'
+import { useAuth } from './ClerkAuthContext'
 
 // Criação do contexto de dados
 const DataContext = createContext(undefined)

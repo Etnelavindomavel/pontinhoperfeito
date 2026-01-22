@@ -7,6 +7,8 @@ import {
   Star,
   Calendar,
   Info,
+  X,
+  Filter,
 } from 'lucide-react'
 import {
   LineChart,
@@ -24,7 +26,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { useData } from '@/contexts/DataContext'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/contexts/ClerkAuthContext'
 import {
   KPICard,
   StatGrid,
@@ -119,6 +121,13 @@ export default function FaturamentoAnalysis({ activeTab = 'overview' }) {
     getDataDateRange,
   } = useData()
 
+  // Estado para filtros interativos
+  const [activeFilters, setActiveFilters] = useState({
+    categoria: null,
+    fornecedor: null,
+    produto: null,
+  })
+
   // Obter dados específicos para faturamento
   const faturamentoData = useMemo(() => {
     return getAnalysisData('faturamento')
@@ -152,9 +161,38 @@ export default function FaturamentoAnalysis({ activeTab = 'overview' }) {
     }
 
     // PRIMEIRO: Aplicar filtro de período
-    const filteredData = dataField
+    let filteredData = dataField
       ? filterDataByPeriod(faturamentoData, dataField)
       : faturamentoData
+
+    // SEGUNDO: Aplicar filtros interativos (categoria, fornecedor, produto)
+    // Função auxiliar para normalizar valores para comparação
+    const normalizeValue = (value) => {
+      if (value == null) return ''
+      return String(value).trim().toLowerCase()
+    }
+
+    if (activeFilters.categoria && categoriaField) {
+      const filterValue = normalizeValue(activeFilters.categoria)
+      filteredData = filteredData.filter((item) => {
+        const itemValue = normalizeValue(item[categoriaField])
+        return itemValue === filterValue
+      })
+    }
+    if (activeFilters.fornecedor && fornecedorField) {
+      const filterValue = normalizeValue(activeFilters.fornecedor)
+      filteredData = filteredData.filter((item) => {
+        const itemValue = normalizeValue(item[fornecedorField])
+        return itemValue === filterValue
+      })
+    }
+    if (activeFilters.produto && produtoField) {
+      const filterValue = normalizeValue(activeFilters.produto)
+      filteredData = filteredData.filter((item) => {
+        const itemValue = normalizeValue(item[produtoField])
+        return itemValue === filterValue
+      })
+    }
 
     // Verificar se há dados após filtrar
     if (!filteredData || filteredData.length === 0) {
@@ -162,17 +200,14 @@ export default function FaturamentoAnalysis({ activeTab = 'overview' }) {
         isEmpty: true,
         periodFilter,
         groupByPeriod,
+        activeFilters,
       }
     }
 
     // Calcular métricas principais com dados filtrados
     const totalRevenue = calculateTotalRevenue(filteredData, valorField)
-    const averageTicket = calculateAverageTicket(
-      filteredData,
-      valorField,
-      quantidadeField
-    )
     const totalTransactions = filteredData.length
+    const averageTicket = totalTransactions > 0 ? totalRevenue / totalTransactions : 0
 
     // Produto mais vendido (por valor)
     let topProduct = null
@@ -220,6 +255,42 @@ export default function FaturamentoAnalysis({ activeTab = 'overview' }) {
       total: abcCurve.length,
     }
 
+    // Calcular comparações de período (se houver data)
+    let revenueComparison = null
+    let salesComparison = null  
+    let ticketComparison = null
+
+    if (dataField && faturamentoData && faturamentoData.length > 0) {
+      // Dividir dados em período atual e anterior
+      const { current, previous } = splitDataByPeriod(
+        faturamentoData,
+        dataField,
+        periodFilter
+      )
+      
+      if (current.length > 0 && previous.length > 0) {
+        // Comparar faturamento
+        revenueComparison = comparePeriodsRevenue(
+          current,
+          previous,
+          valorField
+        )
+        
+        // Comparar vendas
+        salesComparison = comparePeriodsSales(
+          current,
+          previous
+        )
+        
+        // Comparar ticket médio
+        ticketComparison = comparePeriodTicket(
+          current,
+          previous,
+          valorField
+        )
+      }
+    }
+
     return {
       totalRevenue,
       averageTicket,
@@ -231,6 +302,9 @@ export default function FaturamentoAnalysis({ activeTab = 'overview' }) {
       topSuppliers,
       categoryRevenue,
       abcStats,
+      revenueComparison,
+      salesComparison,
+      ticketComparison,
       valorField,
       produtoField,
       quantidadeField,
@@ -240,8 +314,41 @@ export default function FaturamentoAnalysis({ activeTab = 'overview' }) {
       isEmpty: false,
       periodFilter,
       groupByPeriod,
+      activeFilters,
     }
-  }, [faturamentoData, mappedColumns, periodFilter, filterDataByPeriod, groupDataByPeriod, groupByPeriod])
+  }, [faturamentoData, mappedColumns, periodFilter, filterDataByPeriod, groupDataByPeriod, groupByPeriod, activeFilters])
+
+  // Funções para gerenciar filtros
+  const normalizeValue = (value) => {
+    if (value == null) return ''
+    return String(value).trim().toLowerCase()
+  }
+
+  const handleFilterClick = (filterType, filterValue) => {
+    setActiveFilters((prev) => {
+      // Normalizar valores para comparação
+      const currentFilter = normalizeValue(prev[filterType])
+      const newFilter = normalizeValue(filterValue)
+      
+      // Se clicar no mesmo valor (normalizado), remove o filtro
+      if (currentFilter === newFilter) {
+        return { ...prev, [filterType]: null }
+      }
+      // Caso contrário, aplica o filtro (mantém valor original para exibição)
+      return { ...prev, [filterType]: filterValue }
+    })
+  }
+
+  const clearAllFilters = () => {
+    setActiveFilters({
+      categoria: null,
+      fornecedor: null,
+      produto: null,
+    })
+  }
+
+  // Verificar se há filtros ativos
+  const hasActiveFilters = Object.values(activeFilters).some((filter) => filter !== null)
 
   // Se não houver dados, mostrar empty state
   if (!analysisData) {
@@ -456,10 +563,24 @@ export default function FaturamentoAnalysis({ activeTab = 'overview' }) {
                     width={90}
                   />
                   <Tooltip content={<CustomTooltip showPercentage />} />
-                  <Bar dataKey="value" name="Faturamento" fill="#14B8A6">
-                    {topCategories.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
+                  <Bar 
+                    dataKey="value" 
+                    name="Faturamento" 
+                    fill="#14B8A6"
+                    cursor="pointer"
+                  >
+                    {topCategories.map((entry, index) => {
+                      const isActive = activeFilters.categoria && 
+                        normalizeValue(activeFilters.categoria) === normalizeValue(entry.category)
+                      return (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={isActive ? '#0D9488' : COLORS[index % COLORS.length]}
+                          onClick={() => handleFilterClick('categoria', entry.category)}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      )
+                    })}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -509,6 +630,57 @@ export default function FaturamentoAnalysis({ activeTab = 'overview' }) {
   // Renderizar conteúdo baseado na tab ativa
   return (
     <div className="space-y-8">
+      {/* Badge de Filtros Ativos */}
+      {hasActiveFilters && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Filter className="text-blue-600" size={16} />
+              <span className="text-sm font-medium text-blue-900">Filtros ativos:</span>
+              {activeFilters.categoria && (
+                <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                  Categoria: {activeFilters.categoria}
+                  <button
+                    onClick={() => handleFilterClick('categoria', activeFilters.categoria)}
+                    className="hover:bg-blue-200 rounded-full p-0.5"
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              )}
+              {activeFilters.fornecedor && (
+                <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                  Fornecedor: {activeFilters.fornecedor}
+                  <button
+                    onClick={() => handleFilterClick('fornecedor', activeFilters.fornecedor)}
+                    className="hover:bg-blue-200 rounded-full p-0.5"
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              )}
+              {activeFilters.produto && (
+                <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                  Produto: {activeFilters.produto}
+                  <button
+                    onClick={() => handleFilterClick('produto', activeFilters.produto)}
+                    className="hover:bg-blue-200 rounded-full p-0.5"
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              )}
+            </div>
+            <button
+              onClick={clearAllFilters}
+              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+            >
+              Limpar todos
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* TAB: OVERVIEW */}
       {activeTab === 'overview' && (
         <SortableContainer
@@ -528,9 +700,16 @@ export default function FaturamentoAnalysis({ activeTab = 'overview' }) {
         <>
           {/* Explicação da Curva ABC */}
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
-            <h3 className="text-lg font-semibold text-blue-900 mb-3">
-              O que é Curva ABC?
-            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-blue-900">
+                O que é Curva ABC?
+              </h3>
+              {hasActiveFilters && (
+                <span className="text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-medium">
+                  Dados filtrados
+                </span>
+              )}
+            </div>
             <div className="space-y-2 text-sm text-blue-800">
               <p>
                 <span className="font-semibold">Classe A:</span> Produtos que
@@ -555,7 +734,7 @@ export default function FaturamentoAnalysis({ activeTab = 'overview' }) {
                   title="Produtos Classe A"
                   value={abcStats.classA}
                   subtitle={`${formatPercentage(
-                    (abcStats.classA / abcStats.total) * 0.01
+                    abcStats.classA / abcStats.total
                   )} do total`}
                   icon={Star}
                   color="success"
@@ -564,7 +743,7 @@ export default function FaturamentoAnalysis({ activeTab = 'overview' }) {
                   title="Produtos Classe B"
                   value={abcStats.classB}
                   subtitle={`${formatPercentage(
-                    (abcStats.classB / abcStats.total) * 0.01
+                    abcStats.classB / abcStats.total
                   )} do total`}
                   icon={TrendingUp}
                   color="warning"
@@ -573,7 +752,7 @@ export default function FaturamentoAnalysis({ activeTab = 'overview' }) {
                   title="Produtos Classe C"
                   value={abcStats.classC}
                   subtitle={`${formatPercentage(
-                    (abcStats.classC / abcStats.total) * 0.01
+                    abcStats.classC / abcStats.total
                   )} do total`}
                   icon={Package}
                   color="danger"
@@ -676,6 +855,20 @@ export default function FaturamentoAnalysis({ activeTab = 'overview' }) {
                     {
                       key: 'item',
                       label: 'Produto',
+                      render: (value) => {
+                        const isActive = activeFilters.produto && 
+                          normalizeValue(activeFilters.produto) === normalizeValue(value)
+                        return (
+                          <button
+                            onClick={() => handleFilterClick('produto', value)}
+                            className={`text-left hover:underline ${
+                              isActive ? 'font-bold text-primary-600' : ''
+                            }`}
+                          >
+                            {value}
+                          </button>
+                        )
+                      },
                     },
                     {
                       key: 'value',
@@ -740,7 +933,18 @@ export default function FaturamentoAnalysis({ activeTab = 'overview' }) {
         <>
           {/* Visão Geral por Categoria */}
           {categoryRevenue.length > 0 && (
-            <Section title="Distribuição de Faturamento por Categoria">
+            <Section 
+              title={
+                <div className="flex items-center gap-2">
+                  <span>Distribuição de Faturamento por Categoria</span>
+                  {hasActiveFilters && (
+                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">
+                      Filtrado
+                    </span>
+                  )}
+                </div>
+              }
+            >
               <ChartCard title="Participação por Categoria">
                 <ResponsiveContainer width="100%" height={400}>
                   <PieChart>
@@ -755,12 +959,18 @@ export default function FaturamentoAnalysis({ activeTab = 'overview' }) {
                         `${category}: ${formatPercentage(percentage / 100)}`
                       }
                     >
-                      {categoryRevenue.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={COLORS[index % COLORS.length]}
-                        />
-                      ))}
+                      {categoryRevenue.map((entry, index) => {
+                        const isActive = activeFilters.categoria && 
+                          normalizeValue(activeFilters.categoria) === normalizeValue(entry.category)
+                        return (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={isActive ? '#0D9488' : COLORS[index % COLORS.length]}
+                            onClick={() => handleFilterClick('categoria', entry.category)}
+                            style={{ cursor: 'pointer' }}
+                          />
+                        )
+                      })}
                     </Pie>
                     <Tooltip content={<CustomTooltip showPercentage />} />
                     <Legend
@@ -788,6 +998,20 @@ export default function FaturamentoAnalysis({ activeTab = 'overview' }) {
                   {
                     key: 'category',
                     label: 'Categoria',
+                    render: (value) => {
+                      const isActive = activeFilters.categoria && 
+                        normalizeValue(activeFilters.categoria) === normalizeValue(value)
+                      return (
+                        <button
+                          onClick={() => handleFilterClick('categoria', value)}
+                          className={`text-left hover:underline ${
+                            isActive ? 'font-bold text-primary-600' : ''
+                          }`}
+                        >
+                          {value}
+                        </button>
+                      )
+                    },
                   },
                   {
                     key: 'value',

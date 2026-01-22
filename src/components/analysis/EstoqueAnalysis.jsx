@@ -149,7 +149,7 @@ export default function EstoqueAnalysis({ activeTab = 'overview' }) {
 
     // Calcular percentual de estoque encalhado
     const slowMovingPercentage = totalStockValue > 0
-      ? (slowMovingValue / totalStockValue) * 100
+      ? slowMovingValue / totalStockValue
       : 0
 
     // Agrupar rupturas por categoria
@@ -273,14 +273,14 @@ export default function EstoqueAnalysis({ activeTab = 'overview' }) {
             <KPICard
               title="Produtos em Ruptura"
               value={formatNumber(stockoutCount)}
-              subtitle={`${formatPercentage(stockoutCount / totalProducts / 100)} do total`}
+              subtitle={`${formatPercentage(stockoutCount / totalProducts)} do total`}
               icon={AlertTriangle}
               color="danger"
             />
             <KPICard
               title="Produtos Encalhados"
               value={formatNumber(slowMovingCount)}
-              subtitle={`${formatPercentage(slowMovingCount / totalProducts / 100)} do total`}
+              subtitle={`${formatPercentage(slowMovingCount / totalProducts)} do total`}
               icon={TrendingDown}
               color="warning"
             />
@@ -368,8 +368,8 @@ export default function EstoqueAnalysis({ activeTab = 'overview' }) {
                   },
                   {
                     key: 'taxaGiro',
-                    label: 'Taxa de Giro',
-                    render: (value) => formatPercentage(value / 100),
+                    label: 'Movimentação',
+                    render: (value) => formatPercentage(value),
                   },
                 ]}
                 data={slowMovingTable}
@@ -553,8 +553,9 @@ export default function EstoqueAnalysis({ activeTab = 'overview' }) {
                   O que são Produtos Encalhados?
                 </h3>
                 <p className="text-sm text-yellow-800">
-                  Produtos com baixa taxa de giro (vendas / estoque {'<'} 10%).
+                  Produtos com baixa movimentação (vendidos menos de 10% do estoque no período).
                   Estes produtos ocupam espaço e capital que poderiam ser melhor utilizados.
+                  Alta movimentação indica giro rápido; baixa movimentação indica produto parado.
                 </p>
               </div>
             </div>
@@ -613,7 +614,7 @@ export default function EstoqueAnalysis({ activeTab = 'overview' }) {
               />
               <KPICard
                 title="% do Estoque Total"
-                value={formatPercentage(slowMovingPercentage / 100)}
+                value={formatPercentage(slowMovingPercentage)}
                 subtitle="Participação"
                 icon={Package}
                 color="danger"
@@ -650,8 +651,8 @@ export default function EstoqueAnalysis({ activeTab = 'overview' }) {
                   },
                   {
                     key: 'taxaGiro',
-                    label: 'Taxa de Giro',
-                    render: (value) => formatPercentage(value / 100),
+                    label: 'Movimentação',
+                    render: (value) => formatPercentage(value),
                   },
                   {
                     key: 'valorParado',

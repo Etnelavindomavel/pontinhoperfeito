@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
-import { Check, ChevronDown, X } from 'lucide-react'
+import { useState, useRef, useEffect, useMemo } from 'react'
+import { Check, ChevronDown, X, Search } from 'lucide-react'
 
 /**
  * Componente de seleção múltipla com dropdown
@@ -21,18 +21,39 @@ export default function MultiSelect({
   icon: Icon
 }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
   const dropdownRef = useRef(null)
+  const searchInputRef = useRef(null)
   
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsOpen(false)
+        setSearchTerm('') // Limpar busca ao fechar
       }
     }
     
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  // Focar no campo de busca quando abrir o dropdown
+  useEffect(() => {
+    if (isOpen && searchInputRef.current) {
+      searchInputRef.current.focus()
+    }
+  }, [isOpen])
+
+  // Filtrar opções baseado no termo de busca
+  const filteredOptions = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return options
+    }
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+    return options.filter(option => 
+      String(option).toLowerCase().includes(normalizedSearch)
+    )
+  }, [options, searchTerm])
   
   const toggleOption = (option) => {
     if (selected.includes(option)) {
@@ -48,6 +69,11 @@ export default function MultiSelect({
   
   const selectAll = () => {
     onChange([...options])
+  }
+
+  const selectAllFiltered = () => {
+    const allFiltered = filteredOptions.filter(opt => !selected.includes(opt))
+    onChange([...selected, ...allFiltered])
   }
   
   return (
@@ -80,16 +106,32 @@ export default function MultiSelect({
       </button>
       
       {isOpen && (
-        <div className="absolute z-50 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+        <div className="absolute z-50 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 flex flex-col">
+          {/* Campo de busca */}
+          <div className="sticky top-0 bg-gray-50 border-b border-gray-200 px-3 py-2">
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar..."
+                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          </div>
+
           {/* Header com ações */}
-          {options.length > 0 && (
-            <div className="sticky top-0 bg-gray-50 border-b border-gray-200 px-3 py-2 flex items-center justify-between">
+          {filteredOptions.length > 0 && (
+            <div className="sticky top-[49px] bg-gray-50 border-b border-gray-200 px-3 py-2 flex items-center justify-between">
               <button
                 type="button"
-                onClick={selectAll}
+                onClick={selectAllFiltered}
                 className="text-xs text-secondary-600 hover:text-secondary-700 font-medium"
               >
-                Selecionar todos
+                Selecionar todos ({filteredOptions.length})
               </button>
               {selected.length > 0 && (
                 <button
@@ -104,35 +146,40 @@ export default function MultiSelect({
             </div>
           )}
           
-          {/* Lista de opções */}
-          {options.length === 0 ? (
-            <div className="px-4 py-3 text-sm text-gray-500 text-center">
-              Nenhuma opção disponível
-            </div>
-          ) : (
-            <div className="py-1">
-              {options.map((option) => {
-                const isSelected = selected.includes(option)
-                return (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => toggleOption(option)}
-                    className={`w-full flex items-center justify-between px-4 py-2 hover:bg-gray-50 transition-colors ${
-                      isSelected ? 'bg-secondary-50' : ''
-                    }`}
-                  >
-                    <span className={`text-sm text-left ${isSelected ? 'text-secondary-900 font-medium' : 'text-gray-700'}`}>
-                      {option}
-                    </span>
-                    {isSelected && (
-                      <Check size={16} className="text-secondary-600 flex-shrink-0 ml-2" />
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          )}
+          {/* Lista de opções filtradas */}
+          <div className="overflow-y-auto flex-1">
+            {filteredOptions.length === 0 ? (
+              <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                {searchTerm ? `Nenhum resultado para "${searchTerm}"` : 'Nenhuma opção disponível'}
+              </div>
+            ) : (
+              <div className="py-1">
+                {filteredOptions.map((option) => {
+                  const isSelected = selected.includes(option)
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => {
+                        toggleOption(option)
+                        // Não fechar o dropdown após selecionar para permitir múltiplas seleções
+                      }}
+                      className={`w-full flex items-center justify-between px-4 py-2 hover:bg-gray-50 transition-colors ${
+                        isSelected ? 'bg-secondary-50' : ''
+                      }`}
+                    >
+                      <span className={`text-sm text-left ${isSelected ? 'text-secondary-900 font-medium' : 'text-gray-700'}`}>
+                        {option}
+                      </span>
+                      {isSelected && (
+                        <Check size={16} className="text-secondary-600 flex-shrink-0 ml-2" />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
       

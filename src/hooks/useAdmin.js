@@ -1,4 +1,4 @@
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth } from '../contexts/ClerkAuthContext'
 
 /**
  * Hook para verificar se o usuário atual é administrador

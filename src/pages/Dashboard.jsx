@@ -18,8 +18,10 @@ import {
   User,
   Check,
   Edit2,
+  Crown,
 } from 'lucide-react'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/contexts/ClerkAuthContext'
+import { useClerk } from '@clerk/clerk-react'
 import { useData } from '@/contexts/DataContext'
 import { useAdmin } from '@/hooks/useAdmin'
 import { Card, Logo, Button } from '@/components/common'
@@ -28,6 +30,11 @@ import ReportHistory from '@/components/common/ReportHistory'
 import FileUpload from '@/components/dashboard/FileUpload'
 import TestDataGenerator from '@/components/admin/TestDataGenerator'
 import { getReportHistory } from '@/utils/reportHistory'
+import { useSubscription } from '../hooks/useSubscription'
+import UploadLimitCard from '../components/UploadLimitCard'
+import UpgradeModal from '../components/UpgradeModal'
+import SubscriptionBadge from '../components/SubscriptionBadge'
+import { SUBSCRIPTION_TIERS } from '../config/plans'
 
 /**
  * Página principal do Dashboard
@@ -35,7 +42,8 @@ import { getReportHistory } from '@/utils/reportHistory'
  */
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
+  const { signOut } = useClerk()
   const { availableAnalysis, fileName, rawData, clearData, mappedColumns } = useData()
   const { isAdmin } = useAdmin()
 
@@ -50,6 +58,10 @@ export default function Dashboard() {
   
   // Estado para modal de completar perfil
   const [showCompleteProfile, setShowCompleteProfile] = useState(false)
+
+  // Estado para assinatura
+  const { subscription, canUpload, loading: subscriptionLoading } = useSubscription()
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   // Carregar contador de relatórios
   useEffect(() => {
@@ -109,8 +121,22 @@ export default function Dashboard() {
    * Função para fazer logout e redirecionar
    */
   const handleLogout = () => {
-    logout()
-    navigate('/', { replace: true })
+    signOut(() => navigate('/', { replace: true }))
+  }
+
+  /**
+   * Função para verificar limite antes de fazer upload/análise
+   */
+  const handleAnalysis = async () => {
+    // Verificar se pode fazer upload
+    const canDoUpload = await canUpload()
+    
+    if (!canDoUpload) {
+      setShowUpgradeModal(true)
+      return
+    }
+    
+    navigate('/upload')
   }
 
   /**
@@ -300,10 +326,17 @@ export default function Dashboard() {
                 <FileText size={18} />
                 <span>Relatórios</span>
                 {reportCount > 0 && (
-                  <span className="ml-1 px-2 py-0.5 bg-secondary-600 text-white text-xs rounded-full font-semibold">
+                  <span className="ml-1 px-2 py-0.5 bg-primary-700 text-white text-xs rounded-full font-semibold shadow-sm">
                     {reportCount}
                   </span>
                 )}
+              </button>
+              <button
+                onClick={() => navigate('/plans')}
+                className="flex items-center gap-2 px-4 py-2 text-primary border border-primary rounded-lg hover:bg-primary/10 transition-colors font-medium"
+              >
+                <Crown size={20} />
+                <span>Ver Planos</span>
               </button>
             </nav>
 
@@ -314,14 +347,19 @@ export default function Dashboard() {
                 <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-secondary-600 flex items-center justify-center text-white font-semibold text-sm sm:text-base">
                   {getUserInitials()}
                 </div>
-                <span className="text-sm sm:text-base font-medium text-primary-900 hidden sm:block">
-                  {user?.name || 'Usuário'}
+                <div className="flex items-center gap-2 hidden sm:flex">
+                  <span className="text-sm sm:text-base font-medium text-primary-900">
+                    {user?.name || 'Usuário'}
+                  </span>
                   {user?.isAdmin && (
-                    <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full">
+                    <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full">
                       ADMIN
                     </span>
                   )}
-                </span>
+                  {subscription && (
+                    <SubscriptionBadge plan={subscription.plan} size="sm" />
+                  )}
+                </div>
               </div>
 
               {/* Botão Logout */}
@@ -350,6 +388,13 @@ export default function Dashboard() {
 
       {/* Área Principal */}
       <main className="flex-1">
+        {/* Card de Limite de Uploads */}
+        {subscription && (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+            <UploadLimitCard />
+          </div>
+        )}
+
         {/* Seção 1: Upload */}
         {!fileName ? (
           <section className="bg-gradient-to-br from-secondary-50 to-primary-50 py-8 sm:py-12 lg:py-16">
@@ -758,6 +803,15 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Modal de Upgrade */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        currentTier={subscription?.tier || SUBSCRIPTION_TIERS.FREE}
+        requiredTier={SUBSCRIPTION_TIERS.ESSENCIAL}
+        feature="Diagnóstico de dados"
+      />
     </div>
   )
 }

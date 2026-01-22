@@ -12,7 +12,7 @@ import {
   Database,
 } from 'lucide-react'
 import { useData } from '@/contexts/DataContext'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/contexts/ClerkAuthContext'
 import { Card, Button, GlobalFilters } from '@/components/common'
 import DownloadModelModal from '@/components/common/DownloadModelModal'
 import ExportPDFModal from '@/components/common/ExportPDFModal'

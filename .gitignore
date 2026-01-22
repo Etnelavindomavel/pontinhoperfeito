@@ -41,3 +41,9 @@ build
 *.db-shm
 *.db-wal
 ai-code-tracking.db
+
+.vercel
+
+# Repositórios embutidos
+PontoPerfeito/
+my-clerk-app/

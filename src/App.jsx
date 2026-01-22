@@ -1,11 +1,12 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider, useAuth } from './contexts/ClerkAuthContext'
 import { DataProvider } from './contexts/DataContext'
 import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import Analysis from './pages/Analysis'
+import Plans from './pages/Plans'
 import LandingEditor from './pages/admin/LandingEditor'
 import NotFound from './pages/NotFound'
 import InstallPWA from './components/common/InstallPWA'
@@ -54,7 +55,7 @@ function AppRoutes() {
         element={<Landing />}
       />
       <Route
-        path="/login"
+        path="/login/*"
         element={
           <PublicRoute>
             <Login />
@@ -62,7 +63,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/register"
+        path="/register/*"
         element={
           <PublicRoute>
             <Register />
@@ -86,6 +87,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/plans"
+        element={
+          <ProtectedRoute>
+            <Plans />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/admin/landing-editor"
         element={
           <ProtectedRoute>
@@ -100,14 +109,12 @@ function AppRoutes() {
 
 function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <DataProvider>
-          <AppRoutes />
-          <InstallPWA />
-        </DataProvider>
-      </AuthProvider>
-    </Router>
+    <AuthProvider>
+      <DataProvider>
+        <AppRoutes />
+        <InstallPWA />
+      </DataProvider>
+    </AuthProvider>
   )
 }
 
