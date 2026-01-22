@@ -25,11 +25,11 @@ export default function DownloadModelModal({ isOpen, onClose }) {
       if (event?.target) {
         const button = event.target.closest('button')
         if (button) {
-          const originalText = button.innerHTML
-          button.innerHTML = '✓ Baixado!'
+          const originalText = button.textContent || button.innerText
+          button.textContent = '✓ Baixado!'
           button.disabled = true
           setTimeout(() => {
-            button.innerHTML = originalText
+            button.textContent = originalText
             button.disabled = false
           }, 2000)
         }

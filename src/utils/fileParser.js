@@ -17,15 +17,38 @@ const ALLOWED_EXTENSIONS = ['csv', 'xls', 'xlsx']
  * @returns {Object} { valid: boolean, error: string | null }
  */
 export function validateFile(file) {
-  // Verificar se file existe
-  if (!file) {
+  // Verificar se file existe e é uma instância de File
+  if (!file || !(file instanceof File)) {
     return {
       valid: false,
-      error: 'Nenhum arquivo selecionado',
+      error: 'Nenhum arquivo selecionado ou arquivo inválido',
     }
   }
 
-  // Verificar tamanho
+  // Validar nome do arquivo (prevenir path traversal)
+  if (!file.name || file.name.length > 255) {
+    return {
+      valid: false,
+      error: 'Nome de arquivo inválido',
+    }
+  }
+
+  // Validar que não contém caracteres perigosos
+  if (file.name.includes('..') || file.name.includes('/') || file.name.includes('\\')) {
+    return {
+      valid: false,
+      error: 'Nome de arquivo contém caracteres inválidos',
+    }
+  }
+
+  // Verificar tamanho (incluindo arquivo vazio)
+  if (file.size === 0) {
+    return {
+      valid: false,
+      error: 'Arquivo está vazio',
+    }
+  }
+
   if (file.size > MAX_FILE_SIZE) {
     return {
       valid: false,
@@ -33,6 +56,13 @@ export function validateFile(file) {
     }
   }
 
+  // Verificar tipo MIME (validação adicional)
+  const allowedMimeTypes = [
+    'text/csv',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ]
+  
   // Verificar extensão
   const extension = getFileExtension(file.name)
   if (!ALLOWED_EXTENSIONS.includes(extension)) {
@@ -40,6 +70,12 @@ export function validateFile(file) {
       valid: false,
       error: 'Tipo de arquivo não suportado. Use CSV, XLS ou XLSX',
     }
+  }
+
+  // Validação adicional: verificar tipo MIME se disponível
+  if (file.type && !allowedMimeTypes.includes(file.type)) {
+    // Aviso mas não bloqueia (alguns navegadores não detectam corretamente)
+    console.warn('Tipo MIME não corresponde à extensão:', file.type)
   }
 
   return {

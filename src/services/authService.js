@@ -3,6 +3,9 @@ import { supabase } from '../lib/supabase'
 export const authService = {
   // Cadastro
   async signUp({ email, password, name, userData }) {
+    if (!supabase) {
+      throw new Error('Supabase não configurado. Use Clerk para autenticação.')
+    }
     try {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -45,6 +48,9 @@ export const authService = {
 
   // Login
   async signIn({ email, password }) {
+    if (!supabase) {
+      throw new Error('Supabase não configurado. Use Clerk para autenticação.')
+    }
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -75,6 +81,9 @@ export const authService = {
 
   // Logout
   async signOut() {
+    if (!supabase) {
+      return
+    }
     try {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
@@ -86,6 +95,9 @@ export const authService = {
 
   // Obter sessão atual
   async getSession() {
+    if (!supabase) {
+      return { session: null, profile: null }
+    }
     try {
       const { data, error } = await supabase.auth.getSession()
       if (error) throw error
@@ -112,6 +124,9 @@ export const authService = {
 
   // Atualizar perfil
   async updateProfile(userId, updates) {
+    if (!supabase) {
+      throw new Error('Supabase não configurado.')
+    }
     try {
       const { data, error } = await supabase
         .from('users')

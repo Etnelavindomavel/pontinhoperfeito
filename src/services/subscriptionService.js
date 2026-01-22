@@ -4,6 +4,17 @@ import { SUBSCRIPTION_TIERS, getPlanByTier } from '../config/plans';
 export const subscriptionService = {
   // Buscar assinatura do usuário
   async getUserSubscription(userId) {
+    if (!supabase) {
+      // Retornar plano gratuito padrão se Supabase não estiver configurado
+      return {
+        tier: SUBSCRIPTION_TIERS.FREE,
+        status: 'active',
+        expiresAt: null,
+        uploadsThisMonth: 0,
+        uploadsResetAt: null,
+        plan: getPlanByTier(SUBSCRIPTION_TIERS.FREE)
+      }
+    }
     try {
       const { data, error } = await supabase
         .from('users')
@@ -48,6 +59,9 @@ export const subscriptionService = {
 
   // Incrementar contador de uploads
   async incrementUploadCount(userId) {
+    if (!supabase) {
+      return true
+    }
     try {
       const { data, error } = await supabase.rpc('increment_upload_count', {
         user_id: userId
@@ -74,6 +88,9 @@ export const subscriptionService = {
 
   // Atualizar tier da assinatura
   async updateSubscriptionTier(userId, newTier) {
+    if (!supabase) {
+      return true
+    }
     try {
       const { error } = await supabase
         .from('users')

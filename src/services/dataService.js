@@ -3,6 +3,10 @@ import { supabase } from '../lib/supabase'
 export const dataService = {
   // Salvar upload
   async saveUpload(userId, uploadInfo) {
+    if (!supabase) {
+      console.log('ℹ️ Supabase não configurado, usando localStorage')
+      return null
+    }
     try {
       const { data, error } = await supabase
         .from('uploads')
@@ -27,6 +31,10 @@ export const dataService = {
 
   // Salvar dados brutos (em chunks para performance)
   async saveRawData(userId, uploadId, data) {
+    if (!supabase) {
+      console.log('ℹ️ Supabase não configurado, usando localStorage')
+      return true
+    }
     try {
       // Dividir em chunks de 100 registros
       const chunkSize = 100
@@ -63,6 +71,9 @@ export const dataService = {
 
   // Buscar dados do usuário
   async getUserData(userId) {
+    if (!supabase) {
+      return []
+    }
     try {
       const { data, error } = await supabase
         .from('raw_data')
@@ -82,6 +93,9 @@ export const dataService = {
 
   // Buscar uploads do usuário
   async getUserUploads(userId) {
+    if (!supabase) {
+      return []
+    }
     try {
       const { data, error } = await supabase
         .from('uploads')
@@ -99,6 +113,9 @@ export const dataService = {
 
   // Deletar upload e dados relacionados
   async deleteUpload(uploadId) {
+    if (!supabase) {
+      return true
+    }
     try {
       // O cascade delete vai remover os raw_data automaticamente
       const { error } = await supabase

@@ -166,8 +166,8 @@ export default function DataTable({
           if (typeof rendered === 'number') {
             return String(rendered)
           }
-          // Se for elemento React, tenta extrair texto
-          div.innerHTML = String(rendered)
+          // Se for elemento React, tenta extrair texto (sanitizado)
+          // Usar textContent ao invés de innerHTML para prevenir XSS
           const text = div.textContent || div.innerText || String(rendered)
           return text
         }
@@ -191,12 +191,24 @@ export default function DataTable({
       const toast = document.createElement('div')
       toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center space-x-2'
       toast.style.animation = 'fadeIn 0.3s ease-out'
-      toast.innerHTML = `
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-        </svg>
-        <span>${sortedData.length} linhas exportadas para Excel!</span>
-      `
+      // Criar elementos de forma segura (sem innerHTML)
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+      svg.setAttribute('class', 'w-5 h-5')
+      svg.setAttribute('fill', 'none')
+      svg.setAttribute('stroke', 'currentColor')
+      svg.setAttribute('viewBox', '0 0 24 24')
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+      path.setAttribute('stroke-linecap', 'round')
+      path.setAttribute('stroke-linejoin', 'round')
+      path.setAttribute('stroke-width', '2')
+      path.setAttribute('d', 'M5 13l4 4L19 7')
+      svg.appendChild(path)
+      
+      const span = document.createElement('span')
+      span.textContent = `${sortedData.length} linhas exportadas para Excel!`
+      
+      toast.appendChild(svg)
+      toast.appendChild(span)
       document.body.appendChild(toast)
       
       setTimeout(() => {
@@ -209,12 +221,30 @@ export default function DataTable({
       const toast = document.createElement('div')
       toast.className = 'fixed bottom-4 right-4 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center space-x-2'
       toast.style.animation = 'fadeIn 0.3s ease-out'
-      toast.innerHTML = `
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-        </svg>
-        <span>Erro ao exportar para Excel</span>
-      `
+      // Criar elementos de forma segura (sem innerHTML)
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+      svg.setAttribute('class', 'w-5 h-5')
+      svg.setAttribute('fill', 'none')
+      svg.setAttribute('stroke', 'currentColor')
+      svg.setAttribute('viewBox', '0 0 24 24')
+      const path1 = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+      path1.setAttribute('stroke-linecap', 'round')
+      path1.setAttribute('stroke-linejoin', 'round')
+      path1.setAttribute('stroke-width', '2')
+      path1.setAttribute('d', 'M6 18L18 6')
+      const path2 = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+      path2.setAttribute('stroke-linecap', 'round')
+      path2.setAttribute('stroke-linejoin', 'round')
+      path2.setAttribute('stroke-width', '2')
+      path2.setAttribute('d', 'M6 6l12 12')
+      svg.appendChild(path1)
+      svg.appendChild(path2)
+      
+      const span = document.createElement('span')
+      span.textContent = 'Erro ao exportar para Excel'
+      
+      toast.appendChild(svg)
+      toast.appendChild(span)
       document.body.appendChild(toast)
       
       setTimeout(() => {

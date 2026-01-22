@@ -23,13 +23,20 @@ dist-ssr
 *.sln
 *.sw?
 
-# Environment variables
+# Environment variables (CRÍTICO: nunca commitar)
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 .env.production
+.env.*.local
+
+# Secrets e credenciais
+*.key
+*.pem
+secrets/
+credentials/
 
 # Build files
 build
