@@ -2,11 +2,17 @@ import { useState, useEffect } from 'react'
 import { Save, Plus, Trash2, RefreshCw } from 'lucide-react'
 import Button from '../../components/common/Button'
 import Card from '../../components/common/Card'
+import { useToast } from '@/hooks/useToast'
+import ToastContainer from '@/components/common/ToastContainer'
+import ConfirmDialog from '@/components/common/ConfirmDialog'
+import { setSecureItem, getSecureItem, removeSecureItem } from '@/utils/secureStorage'
 
 export default function LandingEditor() {
   const [content, setContent] = useState(null)
   const [activeTab, setActiveTab] = useState('hero')
   const [saved, setSaved] = useState(false)
+  const { toasts, showToast, removeToast } = useToast()
+  const [confirmDialog, setConfirmDialog] = useState(null)
 
   useEffect(() => {
     loadContent()
@@ -14,9 +20,9 @@ export default function LandingEditor() {
 
   function loadContent() {
     try {
-      const saved = localStorage.getItem('pontoPerfeito_landingContent')
+      const saved = getSecureItem('pontoPerfeito_landingContent')
       if (saved) {
-        setContent(JSON.parse(saved))
+        setContent(saved)
       }
     } catch (error) {
       console.error('Erro ao carregar:', error)
@@ -25,20 +31,31 @@ export default function LandingEditor() {
 
   function handleSave() {
     try {
-      localStorage.setItem('pontoPerfeito_landingContent', JSON.stringify(content))
+      setSecureItem('pontoPerfeito_landingContent', content)
       setSaved(true)
+      showToast('Conteúdo salvo com sucesso', 'success')
       setTimeout(() => setSaved(false), 3000)
     } catch (error) {
       console.error('Erro ao salvar:', error)
-      alert('Erro ao salvar. Tente novamente.')
+      showToast('Erro ao salvar. Tente novamente.', 'error')
     }
   }
 
   function handleReset() {
-    if (confirm('Tem certeza? Isso vai restaurar o conteúdo padrão.')) {
-      localStorage.removeItem('pontoPerfeito_landingContent')
-      window.location.reload()
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Restaurar Padrão',
+      message: 'Tem certeza? Isso vai restaurar o conteúdo padrão e todas as alterações serão perdidas.',
+      confirmLabel: 'Sim, restaurar',
+      cancelLabel: 'Cancelar',
+      variant: 'warning',
+      onConfirm: () => {
+        removeSecureItem('pontoPerfeito_landingContent')
+        showToast('Conteúdo restaurado com sucesso', 'success')
+        setConfirmDialog(null)
+        setTimeout(() => window.location.reload(), 1000)
+      },
+    })
   }
 
   function updateHero(field, value) {
@@ -561,6 +578,18 @@ export default function LandingEditor() {
         )}
 
       </div>
+      
+      {/* Toast Container */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+      
+      {/* Confirm Dialog */}
+      {confirmDialog && (
+        <ConfirmDialog
+          {...confirmDialog}
+          isOpen={confirmDialog.isOpen}
+          onCancel={() => setConfirmDialog(null)}
+        />
+      )}
     </div>
   )
 }

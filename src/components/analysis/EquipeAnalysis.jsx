@@ -10,6 +10,7 @@ import {
   Calendar,
   DollarSign,
 } from 'lucide-react'
+import AnalysisSkeleton from '@/components/common/AnalysisSkeleton'
 import {
   BarChart,
   Bar,
@@ -26,6 +27,7 @@ import {
   Line,
 } from 'recharts'
 import { useData } from '@/contexts/DataContext'
+import ActiveFilters from '@/components/common/ActiveFilters'
 import {
   KPICard,
   StatGrid,
@@ -146,7 +148,7 @@ const CustomTooltip = ({ active, payload, label, showPercentage = false }) => {
             {entry.name}: {formatCurrency(entry.value)}
             {showPercentage && entry.payload?.percentage && (
               <span className="text-gray-500 ml-2">
-                ({formatPercentage(entry.payload.percentage / 100)})
+                ({formatPercentage(entry.payload.percentage)})
               </span>
             )}
           </p>
@@ -171,6 +173,8 @@ export default function EquipeAnalysis({ activeTab = 'overview' }) {
     filterDataByPeriod,
     getDataDateRange,
     groupDataByPeriod,
+    addFilter,
+    activeFilters,
   } = useData()
 
   // Obter dados específicos para equipe
@@ -244,6 +248,11 @@ export default function EquipeAnalysis({ activeTab = 'overview' }) {
         ? calculateStandardDeviation(sellerRanking, 'value')
         : 0
 
+    // Calcular Coeficiente de Variação
+    const coefficientOfVariation = averageRevenue > 0
+      ? (revenueStdDev / averageRevenue) * 100
+      : 0
+
     // Calcular diferença entre 1º e último
     const firstValue = sellerRanking.length > 0 ? sellerRanking[0].value : 0
     const lastValue =
@@ -283,6 +292,7 @@ export default function EquipeAnalysis({ activeTab = 'overview' }) {
       sellerCount: sellerRanking.length,
       averageRevenue,
       revenueStdDev,
+      coefficientOfVariation,
       difference,
       pieData,
       rankingTable,
@@ -315,7 +325,12 @@ export default function EquipeAnalysis({ activeTab = 'overview' }) {
   }, [analysisData, selectedSeller])
 
   // Se não houver dados, mostrar empty state
+  // Mostrar skeleton durante carregamento inicial
   if (!analysisData) {
+    return <AnalysisSkeleton />
+  }
+
+  if (analysisData.isEmpty) {
     return (
       <EmptyState
         icon={Users}
@@ -349,6 +364,7 @@ export default function EquipeAnalysis({ activeTab = 'overview' }) {
     sellerCount,
     averageRevenue,
     revenueStdDev,
+    coefficientOfVariation,
     difference,
     pieData,
     rankingTable,
@@ -410,6 +426,9 @@ export default function EquipeAnalysis({ activeTab = 'overview' }) {
   // Renderizar conteúdo baseado na tab ativa
   return (
     <div className="space-y-8">
+      {/* Componente de Filtros Ativos */}
+      <ActiveFilters />
+
       {/* Alerta de Alta Dependência */}
       {topSeller && topSeller.percentage > 40 && (
         <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
@@ -421,7 +440,7 @@ export default function EquipeAnalysis({ activeTab = 'overview' }) {
           </div>
           <p className="text-orange-800 text-sm mt-2">
             <strong>{topSeller.seller}</strong> é responsável por{' '}
-            <strong>{formatPercentage(topSeller.percentage / 100)}</strong> do
+            <strong>{formatPercentage(topSeller.percentage)}</strong> do
             faturamento. Considere desenvolver outros vendedores para reduzir
             riscos.
           </p>
@@ -504,7 +523,7 @@ export default function EquipeAnalysis({ activeTab = 'overview' }) {
                                 Faturamento: {formatCurrency(data.value)}
                               </p>
                               <p className="text-gray-600">
-                                Participação: {formatPercentage(data.percentage / 100)}
+                                Participação: {formatPercentage(data.percentage)}
                               </p>
                             </div>
                           )
@@ -513,7 +532,17 @@ export default function EquipeAnalysis({ activeTab = 'overview' }) {
                       }}
                     />
                     <Legend />
-                    <Bar dataKey="value" name="Faturamento" fill="#14B8A6">
+                    <Bar 
+                      dataKey="value" 
+                      name="Faturamento" 
+                      fill="#14B8A6"
+                      onClick={(data) => {
+                        if (data && data.seller) {
+                          addFilter('vendedor', data.seller)
+                        }
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    >
                       {sellerRanking.slice(0, 10).map((entry, index) => (
                         <Cell
                           key={`cell-${index}`}
@@ -541,7 +570,7 @@ export default function EquipeAnalysis({ activeTab = 'overview' }) {
                       cy="50%"
                       outerRadius={120}
                       label={({ name, percentage }) =>
-                        `${name}: ${formatPercentage(percentage / 100)}`
+                        `${name}: ${formatPercentage(percentage)}`
                       }
                     >
                       {pieData.map((entry, index) => (
@@ -564,7 +593,7 @@ export default function EquipeAnalysis({ activeTab = 'overview' }) {
                                 Faturamento: {formatCurrency(data.value)}
                               </p>
                               <p className="text-gray-600">
-                                Participação: {formatPercentage(data.percentage / 100)}
+                                Participação: {formatPercentage(data.percentage)}
                               </p>
                             </div>
                           )
@@ -611,7 +640,7 @@ export default function EquipeAnalysis({ activeTab = 'overview' }) {
                       {formatCurrency(sellerRanking[1].value)}
                     </p>
                     <p className="text-sm text-gray-600 mb-2">
-                      {formatPercentage(sellerRanking[1].percentage / 100)}
+                      {formatPercentage(sellerRanking[1].percentage)}
                     </p>
                     <p className="text-xs text-gray-500">
                       {sellerPerformance[sellerRanking[1].seller]?.salesCount || 0}{' '}
@@ -639,7 +668,7 @@ export default function EquipeAnalysis({ activeTab = 'overview' }) {
                       {formatCurrency(sellerRanking[0].value)}
                     </p>
                     <p className="text-sm text-gray-600 mb-2">
-                      {formatPercentage(sellerRanking[0].percentage / 100)}
+                      {formatPercentage(sellerRanking[0].percentage)}
                     </p>
                     <p className="text-xs text-gray-500">
                       {sellerPerformance[sellerRanking[0].seller]?.salesCount || 0}{' '}
@@ -664,7 +693,7 @@ export default function EquipeAnalysis({ activeTab = 'overview' }) {
                       {formatCurrency(sellerRanking[2].value)}
                     </p>
                     <p className="text-sm text-gray-600 mb-2">
-                      {formatPercentage(sellerRanking[2].percentage / 100)}
+                      {formatPercentage(sellerRanking[2].percentage)}
                     </p>
                     <p className="text-xs text-gray-500">
                       {sellerPerformance[sellerRanking[2].seller]?.salesCount || 0}{' '}
@@ -699,7 +728,7 @@ export default function EquipeAnalysis({ activeTab = 'overview' }) {
                   {
                     key: 'participacao',
                     label: 'Participação',
-                    render: (value) => formatPercentage(value / 100),
+                    render: (value) => formatPercentage(value),
                   },
                   {
                     key: 'vendas',
@@ -713,6 +742,11 @@ export default function EquipeAnalysis({ activeTab = 'overview' }) {
                   },
                 ]}
                 data={rankingTable}
+                onRowClick={(row) => {
+                  if (row.vendedor) {
+                    addFilter('vendedor', row.vendedor)
+                  }
+                }}
                 sortable={true}
                 allowShowAll={true}
                 defaultRowsToShow={10}
@@ -748,11 +782,23 @@ export default function EquipeAnalysis({ activeTab = 'overview' }) {
                 color="primary"
               />
               <KPICard
-                title="Dispersão"
-                value={formatCurrency(revenueStdDev)}
-                subtitle="Desvio padrão"
+                title="Coeficiente de Variação"
+                value={`${coefficientOfVariation.toFixed(1)}%`}
+                subtitle={
+                  coefficientOfVariation < 25
+                    ? "Equipe homogênea"
+                    : coefficientOfVariation < 50
+                    ? "Dispersão moderada"
+                    : "Alta dispersão"
+                }
                 icon={Award}
-                color="secondary"
+                color={
+                  coefficientOfVariation < 25
+                    ? "success"
+                    : coefficientOfVariation < 50
+                    ? "warning"
+                    : "danger"
+                }
               />
             </StatGrid>
           </Section>
@@ -921,11 +967,6 @@ export default function EquipeAnalysis({ activeTab = 'overview' }) {
                           vendedor:
                             selectedSellerData.performance.averageTicket || 0,
                           media: averageBy(rankingTable, 'ticketMedio'),
-                        },
-                        {
-                          name: 'Vendas',
-                          vendedor: selectedSellerData.performance.salesCount || 0,
-                          media: averageBy(rankingTable, 'vendas'),
                         },
                       ]}
                       margin={{ top: 5, right: 30, left: 20, bottom: 5 }}

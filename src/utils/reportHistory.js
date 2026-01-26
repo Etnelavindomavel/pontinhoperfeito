@@ -3,6 +3,8 @@
  * Armazena informações sobre relatórios gerados no localStorage
  */
 
+import { setSecureItem, getSecureItem, removeSecureItem } from './secureStorage'
+
 const STORAGE_KEY = 'pontoPerfeito_reportHistory'
 
 /**
@@ -33,7 +35,7 @@ export function saveReportToHistory(reportData) {
     // Limitar a 50 relatórios
     const limitedHistory = history.slice(0, 50)
     
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(limitedHistory))
+    setSecureItem(STORAGE_KEY, limitedHistory)
     
     return newReport
   } catch (error) {
@@ -48,8 +50,7 @@ export function saveReportToHistory(reportData) {
  */
 export function getReportHistory() {
   try {
-    const history = localStorage.getItem(STORAGE_KEY)
-    return history ? JSON.parse(history) : []
+    return getSecureItem(STORAGE_KEY) || []
   } catch (error) {
     console.error('Erro ao carregar histórico:', error)
     return []
@@ -65,7 +66,7 @@ export function deleteReport(reportId) {
   try {
     const history = getReportHistory()
     const filtered = history.filter(report => report.id !== reportId)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered))
+    setSecureItem(STORAGE_KEY, filtered)
     return true
   } catch (error) {
     console.error('Erro ao deletar relatório:', error)
@@ -79,7 +80,7 @@ export function deleteReport(reportId) {
  */
 export function clearHistory() {
   try {
-    localStorage.removeItem(STORAGE_KEY)
+    removeSecureItem(STORAGE_KEY)
     return true
   } catch (error) {
     console.error('Erro ao limpar histórico:', error)

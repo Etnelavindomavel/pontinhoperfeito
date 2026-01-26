@@ -19,6 +19,7 @@ import {
   Check,
   Edit2,
   Crown,
+  Loader2,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/ClerkAuthContext'
 import { useClerk } from '@clerk/clerk-react'
@@ -35,6 +36,10 @@ import UploadLimitCard from '../components/UploadLimitCard'
 import UpgradeModal from '../components/UpgradeModal'
 import SubscriptionBadge from '../components/SubscriptionBadge'
 import { SUBSCRIPTION_TIERS } from '../config/plans'
+import { useToast } from '@/hooks/useToast'
+import ToastContainer from '@/components/common/ToastContainer'
+import ConfirmDialog from '@/components/common/ConfirmDialog'
+import { clearAppStorage } from '@/utils/secureStorage'
 
 /**
  * Página principal do Dashboard
@@ -46,6 +51,8 @@ export default function Dashboard() {
   const { signOut } = useClerk()
   const { availableAnalysis, fileName, rawData, clearData, mappedColumns } = useData()
   const { isAdmin } = useAdmin()
+  const { toasts, showToast, removeToast } = useToast()
+  const [confirmDialog, setConfirmDialog] = useState(null)
 
   // Estado para animação de cards recém-disponíveis
   const [newlyAvailable, setNewlyAvailable] = useState(new Set())
@@ -62,6 +69,9 @@ export default function Dashboard() {
   // Estado para assinatura
   const { subscription, canUpload, loading: subscriptionLoading } = useSubscription()
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  
+  // Estado para upload de logo
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
 
   // Carregar contador de relatórios
   useEffect(() => {
@@ -120,8 +130,21 @@ export default function Dashboard() {
   /**
    * Função para fazer logout e redirecionar
    */
-  const handleLogout = () => {
-    signOut(() => navigate('/', { replace: true }))
+  const handleLogout = async () => {
+    try {
+      // Limpar dados do app antes de fazer logout
+      clearAppStorage()
+      
+      // Fazer logout no Clerk
+      signOut(() => {
+        // Redirecionar para home após logout
+        navigate('/', { replace: true })
+        showToast('Logout realizado com sucesso', 'success')
+      })
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error)
+      showToast('Erro ao fazer logout', 'error')
+    }
   }
 
   /**
@@ -164,13 +187,19 @@ export default function Dashboard() {
    * Função para limpar dados
    */
   const handleClearData = () => {
-    if (
-      window.confirm(
-        'Tem certeza que deseja remover os dados atuais? Isso resetará todas as análises.'
-      )
-    ) {
-      clearData()
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Remover Dados',
+      message: 'Tem certeza que deseja remover os dados atuais? Isso resetará todas as análises.',
+      confirmLabel: 'Sim, remover',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+      onConfirm: () => {
+        clearData()
+        showToast('Dados removidos com sucesso', 'success')
+        setConfirmDialog(null)
+      },
+    })
   }
 
   /**
@@ -194,14 +223,14 @@ export default function Dashboard() {
     
     // Validar tamanho (2MB)
     if (file.size > 2 * 1024 * 1024) {
-      alert('Logo deve ter no máximo 2MB')
+      showToast('Logo deve ter no máximo 2MB. Por favor, reduza o tamanho da imagem.', 'error', 5000)
       return
     }
     
     // Validar tipo
     const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml']
     if (!validTypes.includes(file.type)) {
-      alert('Formato inválido. Use PNG, JPG ou SVG')
+      showToast('Formato inválido. Use PNG, JPG ou SVG.', 'error', 5000)
       return
     }
     
@@ -210,11 +239,12 @@ export default function Dashboard() {
     reader.onloadend = () => {
       const updatedUser = { ...user, logo: reader.result }
       localStorage.setItem('pontoPerfeito_user', JSON.stringify(updatedUser))
+      showToast('Logo atualizado com sucesso', 'success')
       // Atualizar contexto e recarregar
-      window.location.reload()
+      setTimeout(() => window.location.reload(), 1000)
     }
     reader.onerror = () => {
-      alert('Erro ao carregar imagem')
+      showToast('Erro ao carregar imagem. Tente novamente.', 'error')
     }
     reader.readAsDataURL(file)
   }
@@ -223,11 +253,21 @@ export default function Dashboard() {
    * Função para remover logo da loja
    */
   const handleRemoveLogo = () => {
-    if (!window.confirm('Deseja remover o logo?')) return
-    
-    const updatedUser = { ...user, logo: null }
-    localStorage.setItem('pontoPerfeito_user', JSON.stringify(updatedUser))
-    window.location.reload()
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Remover Logo',
+      message: 'Deseja remover o logo da loja?',
+      confirmLabel: 'Sim, remover',
+      cancelLabel: 'Cancelar',
+      variant: 'warning',
+      onConfirm: () => {
+        const updatedUser = { ...user, logo: null }
+        localStorage.setItem('pontoPerfeito_user', JSON.stringify(updatedUser))
+        showToast('Logo removido com sucesso', 'success')
+        setConfirmDialog(null)
+        setTimeout(() => window.location.reload(), 1000)
+      },
+    })
   }
 
   /**
@@ -468,9 +508,17 @@ export default function Dashboard() {
                           <button
                             type="button"
                             onClick={() => document.getElementById('logo-upload').click()}
-                            className="text-sm text-secondary-600 hover:text-secondary-700 font-medium"
+                            disabled={isUploadingLogo}
+                            className="text-sm text-secondary-600 hover:text-secondary-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                           >
-                            Alterar logo
+                            {isUploadingLogo ? (
+                              <>
+                                <Loader2 className="animate-spin" size={16} />
+                                Carregando...
+                              </>
+                            ) : (
+                              'Alterar logo'
+                            )}
                           </button>
                           <button
                             type="button"
@@ -494,9 +542,20 @@ export default function Dashboard() {
                         <button
                           type="button"
                           onClick={() => document.getElementById('logo-upload').click()}
-                          className="text-sm text-secondary-600 hover:text-secondary-700 font-medium"
+                          disabled={isUploadingLogo}
+                          className="text-sm text-secondary-600 hover:text-secondary-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                         >
-                          Fazer upload
+                          {isUploadingLogo ? (
+                            <>
+                              <Loader2 className="animate-spin" size={16} />
+                              Carregando...
+                            </>
+                          ) : (
+                            <>
+                              <Upload size={16} />
+                              Fazer upload
+                            </>
+                          )}
                         </button>
                         <p className="text-xs text-gray-500 mt-1">
                           PNG, JPG ou SVG até 2MB
@@ -812,6 +871,18 @@ export default function Dashboard() {
         requiredTier={SUBSCRIPTION_TIERS.ESSENCIAL}
         feature="Diagnóstico de dados"
       />
+      
+      {/* Toast Container */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
+      
+      {/* Confirm Dialog */}
+      {confirmDialog && (
+        <ConfirmDialog
+          {...confirmDialog}
+          isOpen={confirmDialog.isOpen}
+          onCancel={() => setConfirmDialog(null)}
+        />
+      )}
     </div>
   )
 }

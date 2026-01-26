@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Download } from 'lucide-react'
 import { exportTableToExcel } from '../../utils/excelExporter'
+import LoadingOverlay from '../common/LoadingOverlay'
+import { exportRateLimiter } from '@/utils/security'
+import { useAuth } from '@/contexts/ClerkAuthContext'
+import { useToast } from '@/hooks/useToast'
 
 /**
  * Tabela para exibir dados tabulares com ordenação e paginação
@@ -47,6 +51,7 @@ export default function DataTable({
   exportFilename = 'dados',
   exportSheetName = 'Dados',
   title,
+  onRowClick,
 }) {
   const [sortConfig, setSortConfig] = useState({
     key: null,
@@ -54,6 +59,7 @@ export default function DataTable({
   })
   const [currentPage, setCurrentPage] = useState(1)
   const [showAll, setShowAll] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
 
   /**
    * Handler para ordenação
@@ -147,111 +153,71 @@ export default function DataTable({
    * Handler para exportar para Excel
    * SEMPRE exporta TODOS os dados (sortedData completo)
    */
-  const handleExport = () => {
-    // Preparar headers (labels das colunas)
-    const headers = columns.map(col => col.label)
+  const handleExport = async () => {
+    // Rate limiting
+    const userId = user?.id || 'anonymous'
     
-    // Preparar rows (valores das células, usando render se disponível)
-    const rows = sortedData.map(row => 
-      columns.map(column => {
-        const value = row[column.key]
-        if (column.render) {
-          // Se tem render, precisa renderizar como string
-          // Criar elemento temporário para extrair texto
-          const div = document.createElement('div')
-          const rendered = column.render(value, row)
-          if (typeof rendered === 'string') {
-            return rendered
+    if (!exportRateLimiter.isAllowed(userId)) {
+      const timeRemaining = exportRateLimiter.getTimeUntilReset(userId)
+      showToast(
+        `Muitas exportações em pouco tempo. Por favor, aguarde ${timeRemaining} segundos antes de tentar novamente.`,
+        'warning',
+        5000
+      )
+      return
+    }
+    
+    setIsExporting(true)
+    
+    try {
+      // Preparar headers (labels das colunas)
+      const headers = columns.map(col => col.label)
+      
+      // Preparar rows (valores das células, usando render se disponível)
+      const rows = sortedData.map(row => 
+        columns.map(column => {
+          const value = row[column.key]
+          if (column.render) {
+            // Se tem render, precisa renderizar como string
+            // Criar elemento temporário para extrair texto
+            const div = document.createElement('div')
+            const rendered = column.render(value, row)
+            if (typeof rendered === 'string') {
+              return rendered
+            }
+            if (typeof rendered === 'number') {
+              return String(rendered)
+            }
+            // Se for elemento React, tenta extrair texto (sanitizado)
+            // Usar textContent ao invés de innerHTML para prevenir XSS
+            const text = div.textContent || div.innerText || String(rendered)
+            return text
           }
-          if (typeof rendered === 'number') {
-            return String(rendered)
+          if (value === null || value === undefined) {
+            return '—'
           }
-          // Se for elemento React, tenta extrair texto (sanitizado)
-          // Usar textContent ao invés de innerHTML para prevenir XSS
-          const text = div.textContent || div.innerText || String(rendered)
-          return text
-        }
-        if (value === null || value === undefined) {
-          return '—'
-        }
-        return String(value)
-      })
-    )
-    
-    // SEMPRE exportar TODOS os dados
-    const success = exportTableToExcel(
-      headers,
-      rows,
-      exportFilename,
-      exportSheetName
-    )
-    
-    if (success) {
-      // Feedback visual com toast
-      const toast = document.createElement('div')
-      toast.className = 'fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center space-x-2'
-      toast.style.animation = 'fadeIn 0.3s ease-out'
-      // Criar elementos de forma segura (sem innerHTML)
-      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-      svg.setAttribute('class', 'w-5 h-5')
-      svg.setAttribute('fill', 'none')
-      svg.setAttribute('stroke', 'currentColor')
-      svg.setAttribute('viewBox', '0 0 24 24')
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
-      path.setAttribute('stroke-linecap', 'round')
-      path.setAttribute('stroke-linejoin', 'round')
-      path.setAttribute('stroke-width', '2')
-      path.setAttribute('d', 'M5 13l4 4L19 7')
-      svg.appendChild(path)
+          return String(value)
+        })
+      )
       
-      const span = document.createElement('span')
-      span.textContent = `${sortedData.length} linhas exportadas para Excel!`
+      // SEMPRE exportar TODOS os dados
+      const success = exportTableToExcel(
+        headers,
+        rows,
+        exportFilename,
+        exportSheetName
+      )
       
-      toast.appendChild(svg)
-      toast.appendChild(span)
-      document.body.appendChild(toast)
-      
-      setTimeout(() => {
-        toast.style.opacity = '0'
-        toast.style.transition = 'opacity 0.3s'
-        setTimeout(() => toast.remove(), 300)
-      }, 3000)
-    } else {
-      // Toast de erro
-      const toast = document.createElement('div')
-      toast.className = 'fixed bottom-4 right-4 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center space-x-2'
-      toast.style.animation = 'fadeIn 0.3s ease-out'
-      // Criar elementos de forma segura (sem innerHTML)
-      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-      svg.setAttribute('class', 'w-5 h-5')
-      svg.setAttribute('fill', 'none')
-      svg.setAttribute('stroke', 'currentColor')
-      svg.setAttribute('viewBox', '0 0 24 24')
-      const path1 = document.createElementNS('http://www.w3.org/2000/svg', 'path')
-      path1.setAttribute('stroke-linecap', 'round')
-      path1.setAttribute('stroke-linejoin', 'round')
-      path1.setAttribute('stroke-width', '2')
-      path1.setAttribute('d', 'M6 18L18 6')
-      const path2 = document.createElementNS('http://www.w3.org/2000/svg', 'path')
-      path2.setAttribute('stroke-linecap', 'round')
-      path2.setAttribute('stroke-linejoin', 'round')
-      path2.setAttribute('stroke-width', '2')
-      path2.setAttribute('d', 'M6 6l12 12')
-      svg.appendChild(path1)
-      svg.appendChild(path2)
-      
-      const span = document.createElement('span')
-      span.textContent = 'Erro ao exportar para Excel'
-      
-      toast.appendChild(svg)
-      toast.appendChild(span)
-      document.body.appendChild(toast)
-      
-      setTimeout(() => {
-        toast.style.opacity = '0'
-        toast.style.transition = 'opacity 0.3s'
-        setTimeout(() => toast.remove(), 300)
-      }, 3000)
+      if (success) {
+        showToast(`${sortedData.length} linhas exportadas para Excel!`, 'success')
+      } else {
+        showToast('Erro ao exportar para Excel', 'error')
+      }
+    } catch (error) {
+      console.error('Erro ao exportar:', error)
+      showToast('Erro ao exportar arquivo', 'error')
+    } finally {
+      setIsExporting(false)
     }
   }
 
@@ -273,7 +239,7 @@ export default function DataTable({
   }
 
   return (
-    <div className={`w-full space-y-4 ${className}`}>
+    <div className={`w-full space-y-4 relative ${className}`}>
       {/* Header com título e botão exportar */}
       {(exportable || title) && (
         <div className="flex items-center justify-between mb-3">
@@ -333,7 +299,9 @@ export default function DataTable({
                       ${rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
                       hover:bg-gray-100 transition-colors duration-150
                       ${customRowClass}
+                      ${onRowClick ? 'cursor-pointer' : ''}
                     `}
+                    onClick={() => onRowClick && onRowClick(row)}
                   >
                   {columns.map((column) => (
                     <td
@@ -442,6 +410,13 @@ export default function DataTable({
           </div>
         </div>
       )}
+
+      {/* Loading Overlay durante exportação */}
+      <LoadingOverlay 
+        isVisible={isExporting} 
+        message="Exportando para Excel..." 
+        fullScreen={false}
+      />
     </div>
   )
 }

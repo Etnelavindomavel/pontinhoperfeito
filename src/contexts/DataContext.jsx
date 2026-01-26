@@ -12,6 +12,8 @@ import {
 import { ptBR } from 'date-fns/locale'
 import { dataService } from '../services/dataService'
 import { useAuth } from './ClerkAuthContext'
+import { setSecureItem, getSecureItem, removeSecureItem, clearAppStorage } from '@/utils/secureStorage'
+import { apiRateLimiter } from '@/utils/security'
 
 // Criação do contexto de dados
 const DataContext = createContext(undefined)
@@ -163,6 +165,14 @@ export function DataProvider({ children }) {
   const [selectedSuppliers, setSelectedSuppliers] = useState([])
   const [selectedCategories, setSelectedCategories] = useState([])
 
+  // Sistema de filtros interativos
+  const [activeFilters, setActiveFilters] = useState({
+    categoria: null,
+    fornecedor: null,
+    produto: null,
+    vendedor: null,
+  })
+
   /**
    * Salvar dados no localStorage
    */
@@ -177,7 +187,7 @@ export function DataProvider({ children }) {
         columns: data.columns,
         timestamp: new Date().toISOString(),
       }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave))
+      setSecureItem(STORAGE_KEY, dataToSave)
     } catch (error) {
       console.error('Erro ao salvar dados no localStorage:', error)
     }
@@ -188,20 +198,32 @@ export function DataProvider({ children }) {
    */
   const loadFromStorage = () => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        const data = JSON.parse(stored)
-        return {
-          rawData: data.rawData || [],
-          mappedColumns: data.mappedColumns || {},
-          availableAnalysis: data.availableAnalysis || [],
-          fileName: data.fileName || null,
-          fileType: data.fileType || null,
-          columns: data.columns || [],
+      const data = getSecureItem(STORAGE_KEY)
+      if (data && typeof data === 'object') {
+        // Validar estrutura básica dos dados
+        if (Array.isArray(data.rawData) || data.rawData === null || data.rawData === undefined) {
+          return {
+            rawData: data.rawData || [],
+            mappedColumns: data.mappedColumns || {},
+            availableAnalysis: data.availableAnalysis || [],
+            fileName: data.fileName || null,
+            fileType: data.fileType || null,
+            columns: data.columns || [],
+          }
+        } else {
+          console.warn('Dados corrompidos no localStorage, estrutura inválida')
+          // Limpar dados corrompidos
+          removeSecureItem(STORAGE_KEY)
         }
       }
     } catch (error) {
       console.error('Erro ao carregar dados do localStorage:', error)
+      // Se houver erro, limpar dados corrompidos
+      try {
+        removeSecureItem(STORAGE_KEY)
+      } catch (clearError) {
+        console.error('Erro ao limpar dados corrompidos:', clearError)
+      }
     }
     return null
   }
@@ -212,6 +234,16 @@ export function DataProvider({ children }) {
    * @param {Array} parsedData - Dados já parseados (array de objetos ou arrays)
    */
   const processFile = async (file, parsedData) => {
+    // Rate limiting para operações de processamento
+    const userId = 'context-operation'
+    
+    if (!apiRateLimiter.isAllowed(userId)) {
+      const errorMsg = 'Muitas operações. Aguarde um momento antes de tentar novamente.'
+      console.warn('Rate limit atingido no processFile')
+      setState(prev => ({ ...prev, isProcessing: false, error: errorMsg }))
+      throw new Error(errorMsg)
+    }
+
     setState(prev => ({ ...prev, isProcessing: true, error: null }))
 
     try {
@@ -329,7 +361,7 @@ export function DataProvider({ children }) {
 
     // Remover do localStorage
     try {
-      localStorage.removeItem(STORAGE_KEY)
+      removeSecureItem(STORAGE_KEY)
     } catch (error) {
       console.error('Erro ao remover dados do localStorage:', error)
     }
@@ -347,13 +379,23 @@ export function DataProvider({ children }) {
       return []
     }
 
+    let data = rawData
+
+    // Aplicar filtros de período
+    if (mappedColumns.data && periodFilter !== 'all') {
+      data = filterDataByPeriod(data, mappedColumns.data)
+    }
+
+    // Aplicar filtros interativos
+    data = applyActiveFilters(data)
+
     // Filtrar dados baseado no tipo de análise
     switch (analysisType) {
       case 'faturamento':
         // Retornar apenas linhas com valor válido
         const valorColumn = mappedColumns.valor
         if (valorColumn) {
-          return rawData.filter(row => {
+          return data.filter(row => {
             const valor = parseFloat(row[valorColumn])
             return !isNaN(valor) && valor > 0
           })
@@ -362,36 +404,36 @@ export function DataProvider({ children }) {
         const produtoColumn = mappedColumns.produto
         const qtdColumn = mappedColumns.quantidade
         if (produtoColumn && qtdColumn) {
-          return rawData.filter(row => {
+          return data.filter(row => {
             const qtd = parseFloat(row[qtdColumn])
             return !isNaN(qtd) && qtd > 0
           })
         }
-        return rawData
+        return data
 
       case 'estoque':
         // Retornar linhas com estoque válido
         const estoqueColumn = mappedColumns.estoque
         if (estoqueColumn) {
-          return rawData.filter(row => {
+          return data.filter(row => {
             const estoque = parseFloat(row[estoqueColumn])
             return !isNaN(estoque)
           })
         }
         // Se não tem coluna estoque, usar produto + quantidade
         if (mappedColumns.produto && mappedColumns.quantidade) {
-          return rawData.filter(row => {
+          return data.filter(row => {
             const qtd = parseFloat(row[mappedColumns.quantidade])
             return !isNaN(qtd)
           })
         }
-        return rawData
+        return data
 
       case 'equipe':
         // Retornar linhas com vendedor
         const vendedorColumn = mappedColumns.vendedor
         if (vendedorColumn) {
-          return rawData.filter(row => {
+          return data.filter(row => {
             const vendedor = row[vendedorColumn]
             return vendedor && String(vendedor).trim() !== ''
           })
@@ -403,7 +445,7 @@ export function DataProvider({ children }) {
         const categoriaColumn = mappedColumns.categoria
         const fornecedorColumn = mappedColumns.fornecedor
         if (categoriaColumn || fornecedorColumn) {
-          return rawData.filter(row => {
+          return data.filter(row => {
             const categoria = categoriaColumn ? row[categoriaColumn] : null
             const fornecedor = fornecedorColumn ? row[fornecedorColumn] : null
             return (categoria && String(categoria).trim() !== '') ||
@@ -414,10 +456,10 @@ export function DataProvider({ children }) {
 
       case 'marketing':
         // Marketing sempre retorna todos os dados
-        return rawData
+        return data
 
       default:
-        return rawData
+        return data
     }
   }
 
@@ -544,6 +586,83 @@ export function DataProvider({ children }) {
       .sort()
     
     return categories
+  }
+
+  /**
+   * Adicionar filtro ativo
+   * @param {string} filterType - Tipo de filtro ('categoria', 'fornecedor', 'produto', 'vendedor')
+   * @param {string} value - Valor do filtro
+   */
+  const addFilter = (filterType, value) => {
+    setActiveFilters(prev => ({
+      ...prev,
+      [filterType]: value
+    }))
+  }
+
+  /**
+   * Remover filtro ativo
+   * @param {string} filterType - Tipo de filtro a remover
+   */
+  const removeFilter = (filterType) => {
+    setActiveFilters(prev => ({
+      ...prev,
+      [filterType]: null
+    }))
+  }
+
+  /**
+   * Limpar todos os filtros ativos
+   */
+  const clearAllFilters = () => {
+    setActiveFilters({
+      categoria: null,
+      fornecedor: null,
+      produto: null,
+      vendedor: null,
+    })
+  }
+
+  /**
+   * Aplicar filtros ativos aos dados
+   * @param {Array} data - Dados para filtrar
+   * @returns {Array} Dados filtrados
+   */
+  const applyActiveFilters = (data) => {
+    if (!data || data.length === 0) return data
+
+    let filtered = [...data]
+    const { mappedColumns } = state
+
+    // Aplicar filtro de categoria
+    if (activeFilters.categoria && mappedColumns.categoria) {
+      filtered = filtered.filter(row => 
+        row[mappedColumns.categoria] === activeFilters.categoria
+      )
+    }
+
+    // Aplicar filtro de fornecedor
+    if (activeFilters.fornecedor && mappedColumns.fornecedor) {
+      filtered = filtered.filter(row => 
+        row[mappedColumns.fornecedor] === activeFilters.fornecedor
+      )
+    }
+
+    // Aplicar filtro de produto
+    if (activeFilters.produto && mappedColumns.produto) {
+      filtered = filtered.filter(row => 
+        row[mappedColumns.produto] === activeFilters.produto
+      )
+    }
+
+    // Aplicar filtro de vendedor
+    if (activeFilters.vendedor && mappedColumns.vendedor) {
+      filtered = filtered.filter(row => 
+        row[mappedColumns.vendedor] === activeFilters.vendedor
+      )
+    }
+
+    return filtered
   }
 
   /**
@@ -825,6 +944,7 @@ export function DataProvider({ children }) {
     periodFilter,
     groupBy: groupByPeriod, // Exportar como groupBy para compatibilidade
     groupByPeriod, // Também exportar como groupByPeriod
+    setGroupByPeriod,
     processFile,
     clearData,
     getAnalysisData,
@@ -838,6 +958,11 @@ export function DataProvider({ children }) {
     setSelectedCategories,
     getUniqueSuppliers,
     getUniqueCategories,
+    activeFilters,
+    addFilter,
+    removeFilter,
+    clearAllFilters,
+    applyActiveFilters,
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

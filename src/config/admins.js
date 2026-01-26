@@ -1,20 +1,12 @@
-/**
- * Configuração de administradores do sistema
- * Emails dos administradores com acesso completo
- */
+// ⚠️ DEPRECATED: Admin check agora é feito via Clerk metadata
+// Este arquivo será removido em versões futuras
+// 
+// Para adicionar um admin:
+// 1. Acesse Clerk Dashboard
+// 2. Vá em Users → Selecione o usuário
+// 3. Em Metadata → Public Metadata, adicione:
+//    { "isAdmin": true }
 
-// Emails dos administradores do sistema
-export const ADMIN_EMAILS = [
-  'automatizarse@gmail.com',
-  'geraldobrazil@gmail.com'
-]
+export const ADMIN_EMAILS = []
 
-/**
- * Verifica se um email pertence a um administrador
- * @param {string} email - Email a ser verificado
- * @returns {boolean} true se for admin
- */
-export function isAdmin(email) {
-  if (!email) return false
-  return ADMIN_EMAILS.includes(email.toLowerCase().trim())
-}
+console.warn('ADMIN_EMAILS está deprecated. Use Clerk metadata.')

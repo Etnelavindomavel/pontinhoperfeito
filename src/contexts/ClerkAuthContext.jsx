@@ -1,6 +1,6 @@
-import { createContext, useContext } from 'react'
+import { createContext, useContext, useEffect } from 'react'
 import { useUser } from '@clerk/clerk-react'
-import { isAdmin as checkAdminEmail } from '@/config/admins'
+import { clearAppStorage } from '@/utils/secureStorage'
 
 const AuthContext = createContext({})
 
@@ -10,11 +10,21 @@ export function AuthProvider({ children }) {
   // Obter email do usuário
   const userEmail = user?.emailAddresses[0]?.emailAddress
 
-  // Verificar se é admin: por email ou por metadata do Clerk
-  // Só verifica se user existe
+  // Verificar se é admin via Clerk publicMetadata
+  // ⚠️ DEPRECATED: Não usa mais ADMIN_EMAILS do config/admins.js
   const isAdminUser = user
-    ? (userEmail && checkAdminEmail(userEmail)) || user.publicMetadata?.isAdmin || false
+    ? user.publicMetadata?.isAdmin === true || false
     : false
+
+  // Limpar dados locais quando não autenticado
+  useEffect(() => {
+    if (!isLoaded) return
+    
+    if (!user) {
+      // Limpar dados locais quando não autenticado
+      clearAppStorage()
+    }
+  }, [isLoaded, user])
 
   const value = {
     user: user ? {

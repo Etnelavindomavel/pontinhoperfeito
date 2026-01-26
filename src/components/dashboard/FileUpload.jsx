@@ -12,19 +12,11 @@ import {
 import { Button } from '@/components/common'
 import { useData } from '@/contexts/DataContext'
 import fileParser from '@/utils/fileParser'
-
-/**
- * Formata o tamanho do arquivo em bytes para formato legível
- * @param {number} bytes - Tamanho em bytes
- * @returns {string} Tamanho formatado (KB ou MB)
- */
-const formatFileSize = (bytes) => {
-  if (bytes === 0) return '0 Bytes'
-  const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
-}
+import LoadingOverlay from '@/components/common/LoadingOverlay'
+import { useRateLimit } from '@/hooks/useRateLimit'
+import { uploadRateLimiter, processRateLimiter } from '@/utils/security'
+import { useToast } from '@/hooks/useToast'
+import { validateFile, validateCSVStructure, validateCSVContent, formatFileSize } from '@/utils/fileValidation'
 
 /**
  * Retorna o ícone apropriado baseado no tipo de arquivo
@@ -57,10 +49,23 @@ export default function FileUpload({
 }) {
   // Usar o DataContext
   const { processFile, isProcessing: contextProcessing, error: contextError } = useData()
+  const { showToast } = useToast()
+
+  // Rate limiting hooks
+  const { checkRateLimit: checkUploadLimit, isLimited: isUploadLimited } = useRateLimit(
+    uploadRateLimiter,
+    'Muitos uploads em pouco tempo. Aguarde antes de tentar novamente.'
+  )
+
+  const { checkRateLimit: checkProcessLimit, isLimited: isProcessLimited } = useRateLimit(
+    processRateLimiter,
+    'Muitas operações de processamento. Aguarde antes de tentar novamente.'
+  )
 
   const [file, setFile] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isValidating, setIsValidating] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(false)
   const [processedData, setProcessedData] = useState(null)
@@ -76,29 +81,94 @@ export default function FileUpload({
   /**
    * Valida e define o arquivo selecionado
    */
-  const validateAndSetFile = (selectedFile) => {
+  const validateAndSetFile = async (selectedFile) => {
     if (!selectedFile) {
-      setError('Nenhum arquivo selecionado')
+      setError({
+        title: 'Erro',
+        message: 'Nenhum arquivo selecionado',
+        suggestion: 'Selecione um arquivo para continuar.',
+      })
       return false
     }
 
-    // Validar usando fileParser
-    const validation = fileParser.validateFile(selectedFile)
+    // Rate limiting para upload
+    if (!checkUploadLimit()) {
+      return false
+    }
 
-    if (!validation.valid) {
-      setError(validation.error)
-      setFile(null)
+    // Limpar erros anteriores
+    setError(null)
+    setIsValidating(true)
+
+    try {
+      // Validação completa
+      const validation = await validateFile(selectedFile)
+
+      if (!validation.valid) {
+        setError({
+          title: 'Arquivo Inválido',
+          message: validation.error,
+          suggestion: validation.suggestion || 'Verifique se o arquivo está correto e tente novamente.',
+        })
+        setIsValidating(false)
+        return false
+      }
+
+      // Se for CSV, validar estrutura também
+      if (selectedFile.name.toLowerCase().endsWith('.csv')) {
+        const text = await selectedFile.text()
+        
+        // Validar estrutura
+        const csvValidation = validateCSVStructure(text)
+        if (!csvValidation.valid) {
+          setError({
+            title: 'Estrutura CSV Inválida',
+            message: csvValidation.error,
+            suggestion: csvValidation.suggestion || 'Verifique se o arquivo CSV está formatado corretamente com cabeçalhos e dados.',
+          })
+          setIsValidating(false)
+          return false
+        }
+
+        // Validar conteúdo malicioso
+        const contentValidation = validateCSVContent(text)
+        if (!contentValidation.valid) {
+          setError({
+            title: 'Conteúdo Suspeito Detectado',
+            message: contentValidation.error,
+            suggestion: contentValidation.suggestion || 'Remova as fórmulas e use apenas valores no CSV.',
+          })
+          setIsValidating(false)
+          return false
+        }
+
+        console.log('CSV válido:', csvValidation)
+      }
+
+      // Arquivo válido - continuar
+      setFile(selectedFile)
+      setError(null)
       setSuccess(false)
       setProcessedData(null)
+      setIsValidating(false)
+
+      // Mostrar feedback positivo
+      showToast(
+        `Arquivo "${selectedFile.name}" validado com sucesso (${formatFileSize(selectedFile.size)})`,
+        'success'
+      )
+      
+      return true
+    } catch (error) {
+      console.error('Erro na validação:', error)
+      setError({
+        title: 'Erro na Validação',
+        message: 'Ocorreu um erro ao validar o arquivo.',
+        suggestion: 'Tente novamente ou use outro arquivo.',
+      })
+      setIsValidating(false)
       return false
     }
-
-    // Arquivo válido
-    setFile(selectedFile)
-    setError(null)
-    setSuccess(false)
-    setProcessedData(null)
-    return true
   }
 
   /**
@@ -178,6 +248,11 @@ export default function FileUpload({
    */
   const handleProcess = async () => {
     if (!file) return
+
+    // Rate limiting para processamento
+    if (!checkProcessLimit()) {
+      return
+    }
 
     setIsProcessing(true)
     setError(null)
@@ -379,10 +454,11 @@ export default function FileUpload({
                   e.stopPropagation()
                   handleProcess()
                 }}
+                disabled={isProcessingCombined || isProcessLimited}
                 icon={CheckCircle}
-                className="flex-1 sm:flex-none"
+                className={`flex-1 sm:flex-none ${isProcessLimited ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                Processar Arquivo
+                {isProcessLimited ? 'Aguarde...' : 'Processar Arquivo'}
               </Button>
               <Button
                 variant="outline"
@@ -509,15 +585,32 @@ export default function FileUpload({
 
       {/* Mensagem de erro abaixo do container (quando há arquivo) */}
       {displayError && file && currentState !== 'success' && (
-        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <div className="flex items-start gap-2">
-            <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-red-600" role="alert">
-              {displayError}
-            </p>
+        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
+            <div className="flex-1">
+              <p className="font-semibold text-red-900 mb-1">
+                {typeof displayError === 'string' ? 'Erro' : displayError.title || 'Erro'}
+              </p>
+              <p className="text-sm text-red-700 mb-3">
+                {typeof displayError === 'string' ? displayError : displayError.message}
+              </p>
+              {typeof displayError === 'object' && displayError.suggestion && (
+                <div className="bg-white rounded p-3 border border-red-200">
+                  <p className="text-sm font-medium text-gray-900 mb-1">💡 Sugestão:</p>
+                  <p className="text-sm text-gray-700">{displayError.suggestion}</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
+
+      {/* Loading Overlay durante processamento */}
+      <LoadingOverlay 
+        isVisible={isProcessingCombined} 
+        message="Processando arquivo..." 
+      />
     </div>
   )
 }

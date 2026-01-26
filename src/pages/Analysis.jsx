@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -16,7 +16,14 @@ import { useAuth } from '@/contexts/ClerkAuthContext'
 import { Card, Button, GlobalFilters } from '@/components/common'
 import DownloadModelModal from '@/components/common/DownloadModelModal'
 import ExportPDFModal from '@/components/common/ExportPDFModal'
-import { FaturamentoAnalysis, EstoqueAnalysis, EquipeAnalysis, LayoutAnalysis, MarketingAnalysis } from '@/components/analysis'
+import ErrorBoundary from '@/components/common/ErrorBoundary'
+
+// Lazy loading de componentes de análise
+const FaturamentoAnalysis = lazy(() => import('@/components/analysis/FaturamentoAnalysis'))
+const EstoqueAnalysis = lazy(() => import('@/components/analysis/EstoqueAnalysis'))
+const EquipeAnalysis = lazy(() => import('@/components/analysis/EquipeAnalysis'))
+const LayoutAnalysis = lazy(() => import('@/components/analysis/LayoutAnalysis'))
+const MarketingAnalysis = lazy(() => import('@/components/analysis/MarketingAnalysis'))
 import { 
   calculateTotalRevenue, 
   calculateAverageTicket,
@@ -328,28 +335,74 @@ export default function Analysis() {
     }
   }, [rawData, mappedColumns, filterDataByPeriod, periodFilter, selectedSuppliers, selectedCategories, user])
 
+  // Componente de loading específico para análises
+  const AnalysisLoader = () => (
+    <div className="flex items-center justify-center py-12">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-800 mx-auto mb-3"></div>
+        <p className="text-gray-600">Carregando análise...</p>
+      </div>
+    </div>
+  )
+
   /**
    * Renderizar conteúdo da análise baseado no tipo
    */
   const renderAnalysisContent = () => {
     switch (type) {
       case 'faturamento':
-        return <FaturamentoAnalysis activeTab={activeTab} />
+        return (
+          <ErrorBoundary>
+            <Suspense fallback={<AnalysisLoader />}>
+              <FaturamentoAnalysis activeTab={activeTab} />
+            </Suspense>
+          </ErrorBoundary>
+        )
 
       case 'estoque':
-        return <EstoqueAnalysis activeTab={activeTab} />
+        return (
+          <ErrorBoundary>
+            <Suspense fallback={<AnalysisLoader />}>
+              <EstoqueAnalysis activeTab={activeTab} />
+            </Suspense>
+          </ErrorBoundary>
+        )
 
       case 'equipe':
-        return <EquipeAnalysis activeTab={activeTab} />
+        return (
+          <ErrorBoundary>
+            <Suspense fallback={<AnalysisLoader />}>
+              <EquipeAnalysis activeTab={activeTab} />
+            </Suspense>
+          </ErrorBoundary>
+        )
 
       case 'layout':
-        return <LayoutAnalysis activeTab={activeTab} />
+        return (
+          <ErrorBoundary>
+            <Suspense fallback={<AnalysisLoader />}>
+              <LayoutAnalysis activeTab={activeTab} />
+            </Suspense>
+          </ErrorBoundary>
+        )
 
       case 'marketing':
-        return <MarketingAnalysis activeTab={activeTab} />
+        return (
+          <ErrorBoundary>
+            <Suspense fallback={<AnalysisLoader />}>
+              <MarketingAnalysis activeTab={activeTab} />
+            </Suspense>
+          </ErrorBoundary>
+        )
 
       default:
-        return <FaturamentoAnalysis activeTab={activeTab} />
+        return (
+          <ErrorBoundary>
+            <Suspense fallback={<AnalysisLoader />}>
+              <FaturamentoAnalysis activeTab={activeTab} />
+            </Suspense>
+          </ErrorBoundary>
+        )
     }
   }
 

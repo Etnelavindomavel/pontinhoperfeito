@@ -10,6 +10,7 @@ import {
   Lightbulb,
   Calendar,
 } from 'lucide-react'
+import AnalysisSkeleton from '@/components/common/AnalysisSkeleton'
 import {
   BarChart,
   Bar,
@@ -25,6 +26,7 @@ import {
   Treemap,
 } from 'recharts'
 import { useData } from '@/contexts/DataContext'
+import ActiveFilters from '@/components/common/ActiveFilters'
 import {
   KPICard,
   StatGrid,
@@ -233,6 +235,8 @@ export default function LayoutAnalysis({ activeTab = 'overview' }) {
     setPeriodFilter,
     filterDataByPeriod,
     getDataDateRange,
+    addFilter,
+    activeFilters,
   } = useData()
 
   // Obter dados específicos para layout
@@ -425,8 +429,13 @@ export default function LayoutAnalysis({ activeTab = 'overview' }) {
     }
   }, [layoutData, mappedColumns, periodFilter, filterDataByPeriod])
 
-  // Se não houver dados, mostrar empty state
+  // Mostrar skeleton durante carregamento inicial
   if (!analysisData) {
+    return <AnalysisSkeleton />
+  }
+
+  // Se não houver dados após filtrar
+  if (analysisData.isEmpty) {
     return (
       <EmptyState
         icon={Store}
@@ -436,20 +445,6 @@ export default function LayoutAnalysis({ activeTab = 'overview' }) {
     )
   }
 
-  // Se não houver dados após filtrar
-  if (analysisData.isEmpty) {
-    return (
-      <div className="bg-white rounded-xl p-8 text-center">
-        <Calendar size={48} className="mx-auto text-gray-400 mb-4" />
-        <h3 className="text-lg font-semibold mb-2">
-          Nenhum dado neste período
-        </h3>
-        <p className="text-gray-600 mb-4">
-          Tente selecionar um período diferente ou use Todos os Dados
-        </p>
-      </div>
-    )
-  }
 
   const {
     categoryDistribution,
@@ -469,6 +464,8 @@ export default function LayoutAnalysis({ activeTab = 'overview' }) {
   // Renderizar conteúdo baseado na tab ativa
   return (
     <div className="space-y-8">
+      {/* Componente de Filtros Ativos */}
+      <ActiveFilters />
       {/* Insights Automáticos */}
       {insights.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -554,6 +551,12 @@ export default function LayoutAnalysis({ activeTab = 'overview' }) {
                         label={({ name, percentage }) =>
                           `${name}: ${formatPercentage(percentage / 100)}`
                         }
+                        onClick={(data) => {
+                          if (data && data.name) {
+                            addFilter('categoria', data.name)
+                          }
+                        }}
+                        style={{ cursor: 'pointer' }}
                       >
                         {categoryRevenue.map((entry, index) => (
                           <Cell
@@ -639,6 +642,12 @@ export default function LayoutAnalysis({ activeTab = 'overview' }) {
                         label={({ name, percentage }) =>
                           `${name}: ${formatPercentage(percentage / 100)}`
                         }
+                        onClick={(data) => {
+                          if (data && data.name) {
+                            addFilter('fornecedor', data.name)
+                          }
+                        }}
+                        style={{ cursor: 'pointer' }}
                       >
                         {supplierRevenue.map((entry, index) => (
                           <Cell
@@ -866,6 +875,11 @@ export default function LayoutAnalysis({ activeTab = 'overview' }) {
                     percentage: cat.percentage,
                     count: cat.count,
                   }))}
+                  onRowClick={(row) => {
+                    if (row.category) {
+                      addFilter('categoria', row.category)
+                    }
+                  }}
                   sortable={true}
                   allowShowAll={true}
                   defaultRowsToShow={10}
@@ -911,6 +925,11 @@ export default function LayoutAnalysis({ activeTab = 'overview' }) {
                     percentage: sup.percentage,
                     count: sup.count,
                   }))}
+                  onRowClick={(row) => {
+                    if (row.supplier) {
+                      addFilter('fornecedor', row.supplier)
+                    }
+                  }}
                   sortable={true}
                   allowShowAll={true}
                   defaultRowsToShow={10}

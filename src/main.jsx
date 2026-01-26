@@ -5,6 +5,7 @@ import { ClerkProvider } from '@clerk/clerk-react'
 import { ptBR } from '@clerk/localizations'
 import App from './App.jsx'
 import './index.css'
+import { runStorageMigration } from './utils/storageMigration'
 
 // Validação segura de variáveis de ambiente
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
@@ -31,6 +32,9 @@ if (
 if (!PUBLISHABLE_KEY.startsWith('pk_')) {
   console.warn('⚠️ VITE_CLERK_PUBLISHABLE_KEY não parece ter formato válido (deve começar com pk_)')
 }
+
+// Executar migração de storage (uma vez)
+runStorageMigration()
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

@@ -979,3 +979,170 @@ export function splitDataByPeriod(data, dateField) {
     return { current: [], previous: [] }
   }
 }
+
+// ============================================================================
+// CURVA ABC PERSONALIZADA (ABCD)
+// ============================================================================
+
+/**
+ * Calcula Curva ABC de Categorias com classificação ABCD
+ * A: 50%, B: 25%, C: 15%, D: 10%
+ * @param {Array} data - Array de dados
+ * @param {string} categoryField - Nome do campo de categoria
+ * @param {string} valueField - Nome do campo de valor
+ * @returns {Array} Array de { category: string, value: number, count: number, percentage: number, accumulatedPercentage: number, class: 'A'|'B'|'C'|'D' }
+ */
+export function calculateABCCategories(data, categoryField, valueField) {
+  if (!data || data.length === 0 || !categoryField || !valueField) {
+    return []
+  }
+
+  // Agrupar por categoria e calcular total
+  const grouped = groupBy(data, categoryField)
+  
+  const categoryStats = Object.keys(grouped).map((category) => {
+    const items = grouped[category]
+    const value = sumBy(items, valueField)
+    const count = items.length
+    
+    return {
+      category,
+      value,
+      count,
+      percentage: 0, // Calcular depois
+      accumulatedPercentage: 0, // Calcular depois
+      class: '', // Calcular depois
+    }
+  })
+
+  // Ordenar por valor (maior primeiro)
+  categoryStats.sort((a, b) => b.value - a.value)
+
+  // Calcular percentuais e acumulados
+  const totalValue = categoryStats.reduce((sum, item) => sum + item.value, 0)
+  
+  let accumulated = 0
+  categoryStats.forEach((item) => {
+    item.percentage = totalValue > 0 ? (item.value / totalValue) * 100 : 0
+    accumulated += item.percentage
+    item.accumulatedPercentage = accumulated
+    
+    // Classificar: A=50%, B=25%, C=15%, D=10%
+    if (accumulated <= 50) {
+      item.class = 'A'
+    } else if (accumulated <= 75) { // 50 + 25
+      item.class = 'B'
+    } else if (accumulated <= 90) { // 50 + 25 + 15
+      item.class = 'C'
+    } else {
+      item.class = 'D'
+    }
+  })
+
+  return categoryStats
+}
+
+/**
+ * Calcula Curva ABC de Produtos dentro de uma Categoria
+ * A: 70%, B: 10%, C: 10%, D: 10%
+ * Identifica D Crítico (< 1% da categoria)
+ * @param {Array} data - Array de dados
+ * @param {string} productField - Nome do campo de produto
+ * @param {string} valueField - Nome do campo de valor
+ * @param {string} categoryField - Nome do campo de categoria (opcional)
+ * @param {string} selectedCategory - Categoria selecionada (opcional)
+ * @returns {Array} Array de { product: string, value: number, count: number, percentage: number, accumulatedPercentage: number, class: 'A'|'B'|'C'|'D', isCritical: boolean }
+ */
+export function calculateABCProducts(data, productField, valueField, categoryField, selectedCategory) {
+  if (!data || data.length === 0 || !productField || !valueField) {
+    return []
+  }
+
+  // Filtrar apenas produtos da categoria selecionada (se fornecida)
+  let filteredData = data
+  if (selectedCategory && categoryField) {
+    filteredData = data.filter((row) => row[categoryField] === selectedCategory)
+  }
+
+  if (filteredData.length === 0) {
+    return []
+  }
+
+  // Agrupar por produto e calcular total
+  const grouped = groupBy(filteredData, productField)
+  
+  const productStats = Object.keys(grouped).map((product) => {
+    const items = grouped[product]
+    const value = sumBy(items, valueField)
+    const count = items.length
+    
+    return {
+      product,
+      value,
+      count,
+      percentage: 0,
+      accumulatedPercentage: 0,
+      class: '',
+      isCritical: false, // < 1% da categoria
+    }
+  })
+
+  // Ordenar por valor (maior primeiro)
+  productStats.sort((a, b) => b.value - a.value)
+
+  // Calcular percentuais e acumulados
+  const totalValue = productStats.reduce((sum, item) => sum + item.value, 0)
+  
+  let accumulated = 0
+  productStats.forEach((item) => {
+    item.percentage = totalValue > 0 ? (item.value / totalValue) * 100 : 0
+    accumulated += item.percentage
+    item.accumulatedPercentage = accumulated
+    
+    // Classificar: A=70%, B=10%, C=10%, D=10%
+    if (accumulated <= 70) {
+      item.class = 'A'
+    } else if (accumulated <= 80) { // 70 + 10
+      item.class = 'B'
+    } else if (accumulated <= 90) { // 70 + 10 + 10
+      item.class = 'C'
+    } else {
+      item.class = 'D'
+      // Marcar como crítico se < 1%
+      if (item.percentage < 1) {
+        item.isCritical = true
+      }
+    }
+  })
+
+  return productStats
+}
+
+/**
+ * Calcula estatísticas da curva ABC
+ * @param {Array} abcData - Array de dados da curva ABC
+ * @returns {Object} { classA: number, classB: number, classC: number, classD: number, classDCritical: number, total: number }
+ */
+export function calculateABCStats(abcData) {
+  if (!abcData || abcData.length === 0) {
+    return {
+      classA: 0,
+      classB: 0,
+      classC: 0,
+      classD: 0,
+      classDCritical: 0,
+      total: 0,
+    }
+  }
+
+  const stats = {
+    classA: abcData.filter((item) => item.class === 'A').length,
+    classB: abcData.filter((item) => item.class === 'B').length,
+    classC: abcData.filter((item) => item.class === 'C').length,
+    classD: abcData.filter((item) => item.class === 'D').length,
+    classDCritical: abcData.filter((item) => item.isCritical).length,
+    total: abcData.length,
+  }
+
+  return stats
+}

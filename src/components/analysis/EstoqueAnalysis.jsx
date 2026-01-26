@@ -7,6 +7,7 @@ import {
   AlertCircle,
   Calendar,
 } from 'lucide-react'
+import AnalysisSkeleton from '@/components/common/AnalysisSkeleton'
 import {
   BarChart,
   Bar,
@@ -18,6 +19,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { useData } from '@/contexts/DataContext'
+import ActiveFilters from '@/components/common/ActiveFilters'
 import {
   KPICard,
   StatGrid,
@@ -83,6 +85,8 @@ export default function EstoqueAnalysis({ activeTab = 'overview' }) {
     setPeriodFilter,
     filterDataByPeriod,
     getDataDateRange,
+    addFilter,
+    activeFilters,
   } = useData()
 
   // Obter dados específicos para estoque
@@ -212,7 +216,12 @@ export default function EstoqueAnalysis({ activeTab = 'overview' }) {
   }, [estoqueData, mappedColumns, periodFilter, filterDataByPeriod])
 
   // Se não houver dados, mostrar empty state
+  // Mostrar skeleton durante carregamento inicial
   if (!analysisData) {
+    return <AnalysisSkeleton />
+  }
+
+  if (analysisData.isEmpty) {
     return (
       <EmptyState
         icon={Package}
@@ -258,6 +267,9 @@ export default function EstoqueAnalysis({ activeTab = 'overview' }) {
   // Renderizar conteúdo baseado na tab ativa
   return (
     <div className="space-y-8">
+      {/* Componente de Filtros Ativos */}
+      <ActiveFilters />
+
       {/* TAB: OVERVIEW */}
       {activeTab === 'overview' && (
         <>
@@ -318,6 +330,11 @@ export default function EstoqueAnalysis({ activeTab = 'overview' }) {
                   },
                 ]}
                 data={stockoutsTable}
+                onRowClick={(row) => {
+                  if (row.produto) {
+                    addFilter('produto', row.produto)
+                  }
+                }}
                 sortable={true}
                 allowShowAll={true}
                 defaultRowsToShow={10}
@@ -373,6 +390,11 @@ export default function EstoqueAnalysis({ activeTab = 'overview' }) {
                   },
                 ]}
                 data={slowMovingTable}
+                onRowClick={(row) => {
+                  if (row.produto) {
+                    addFilter('produto', row.produto)
+                  }
+                }}
                 sortable={true}
                 allowShowAll={true}
                 defaultRowsToShow={10}
@@ -510,6 +532,11 @@ export default function EstoqueAnalysis({ activeTab = 'overview' }) {
                   },
                 ]}
                 data={stockoutsTable.sort((a, b) => a.estoque - b.estoque)}
+                onRowClick={(row) => {
+                  if (row.produto) {
+                    addFilter('produto', row.produto)
+                  }
+                }}
                 sortable={true}
                 allowShowAll={true}
                 defaultRowsToShow={10}
@@ -661,6 +688,11 @@ export default function EstoqueAnalysis({ activeTab = 'overview' }) {
                   },
                 ]}
                 data={slowMovingTable.sort((a, b) => b.valorParado - a.valorParado)}
+                onRowClick={(row) => {
+                  if (row.produto) {
+                    addFilter('produto', row.produto)
+                  }
+                }}
                 sortable={true}
                 allowShowAll={true}
                 defaultRowsToShow={10}

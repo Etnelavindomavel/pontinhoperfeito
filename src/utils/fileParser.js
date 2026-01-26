@@ -1,88 +1,6 @@
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
-
-/**
- * Tamanho máximo de arquivo permitido (10MB)
- */
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB em bytes
-
-/**
- * Extensões de arquivo permitidas
- */
-const ALLOWED_EXTENSIONS = ['csv', 'xls', 'xlsx']
-
-/**
- * Valida arquivo antes de processar
- * @param {File} file - Arquivo a ser validado
- * @returns {Object} { valid: boolean, error: string | null }
- */
-export function validateFile(file) {
-  // Verificar se file existe e é uma instância de File
-  if (!file || !(file instanceof File)) {
-    return {
-      valid: false,
-      error: 'Nenhum arquivo selecionado ou arquivo inválido',
-    }
-  }
-
-  // Validar nome do arquivo (prevenir path traversal)
-  if (!file.name || file.name.length > 255) {
-    return {
-      valid: false,
-      error: 'Nome de arquivo inválido',
-    }
-  }
-
-  // Validar que não contém caracteres perigosos
-  if (file.name.includes('..') || file.name.includes('/') || file.name.includes('\\')) {
-    return {
-      valid: false,
-      error: 'Nome de arquivo contém caracteres inválidos',
-    }
-  }
-
-  // Verificar tamanho (incluindo arquivo vazio)
-  if (file.size === 0) {
-    return {
-      valid: false,
-      error: 'Arquivo está vazio',
-    }
-  }
-
-  if (file.size > MAX_FILE_SIZE) {
-    return {
-      valid: false,
-      error: `Arquivo muito grande. Tamanho máximo: ${(MAX_FILE_SIZE / (1024 * 1024)).toFixed(0)}MB`,
-    }
-  }
-
-  // Verificar tipo MIME (validação adicional)
-  const allowedMimeTypes = [
-    'text/csv',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  ]
-  
-  // Verificar extensão
-  const extension = getFileExtension(file.name)
-  if (!ALLOWED_EXTENSIONS.includes(extension)) {
-    return {
-      valid: false,
-      error: 'Tipo de arquivo não suportado. Use CSV, XLS ou XLSX',
-    }
-  }
-
-  // Validação adicional: verificar tipo MIME se disponível
-  if (file.type && !allowedMimeTypes.includes(file.type)) {
-    // Aviso mas não bloqueia (alguns navegadores não detectam corretamente)
-    console.warn('Tipo MIME não corresponde à extensão:', file.type)
-  }
-
-  return {
-    valid: true,
-    error: null,
-  }
-}
+import { validateFile, validateCSVStructure, validateProcessingLimits } from './fileValidation'
 
 /**
  * Extrai extensão do arquivo
@@ -229,6 +147,20 @@ export function parseCSV(file) {
                 error: 'Arquivo CSV sem linhas de dados válidas',
               })
             }
+
+            // Validar limites de processamento
+            const limitsValidation = validateProcessingLimits(cleanData)
+            if (!limitsValidation.valid) {
+              return resolve({
+                success: false,
+                data: [],
+                headers: [],
+                rowCount: 0,
+                error: limitsValidation.error,
+              })
+            }
+            
+            console.log(`Arquivo CSV processado: ${limitsValidation.rows} linhas, ${limitsValidation.columns} colunas`)
 
             // Retornar sucesso
             resolve({
@@ -429,67 +361,47 @@ export function parseExcel(file) {
  * @param {File} file - Arquivo a ser parseado
  * @returns {Promise<Object>} { success, data, headers, rowCount, error }
  */
-export function parseFile(file) {
-  return new Promise((resolve) => {
-    try {
-      // Validar arquivo primeiro
-      const validation = validateFile(file)
-      if (!validation.valid) {
-        return resolve({
-          success: false,
-          data: [],
-          headers: [],
-          rowCount: 0,
-          error: validation.error,
-        })
-      }
-
-      // Detectar tipo de arquivo pela extensão
-      const extension = getFileExtension(file.name)
-
-      // Parsear baseado no tipo
-      if (extension === 'csv') {
-        parseCSV(file).then(resolve).catch((error) => {
-          console.error('Erro inesperado ao parsear CSV:', error)
-          resolve({
-            success: false,
-            data: [],
-            headers: [],
-            rowCount: 0,
-            error: `Erro ao processar arquivo CSV: ${error.message}`,
-          })
-        })
-      } else if (extension === 'xls' || extension === 'xlsx') {
-        parseExcel(file).then(resolve).catch((error) => {
-          console.error('Erro inesperado ao parsear Excel:', error)
-          resolve({
-            success: false,
-            data: [],
-            headers: [],
-            rowCount: 0,
-            error: `Erro ao processar arquivo Excel: ${error.message}`,
-          })
-        })
-      } else {
-        resolve({
-          success: false,
-          data: [],
-          headers: [],
-          rowCount: 0,
-          error: `Tipo de arquivo não suportado: ${extension}`,
-        })
-      }
-    } catch (error) {
-      console.error('Erro geral ao parsear arquivo:', error)
-      resolve({
+export async function parseFile(file) {
+  try {
+    // Validar arquivo primeiro
+    const validation = await validateFile(file)
+    if (!validation.valid) {
+      return {
         success: false,
         data: [],
         headers: [],
         rowCount: 0,
-        error: `Erro ao processar arquivo: ${error.message}`,
-      })
+        error: validation.error,
+      }
     }
-  })
+
+    // Detectar tipo de arquivo pela extensão
+    const extension = getFileExtension(file.name)
+
+    // Parsear baseado no tipo
+    if (extension === 'csv') {
+      return await parseCSV(file)
+    } else if (extension === 'xls' || extension === 'xlsx') {
+      return await parseExcel(file)
+    } else {
+      return {
+        success: false,
+        data: [],
+        headers: [],
+        rowCount: 0,
+        error: `Tipo de arquivo não suportado: ${extension}`,
+      }
+    }
+  } catch (error) {
+    console.error('Erro geral ao parsear arquivo:', error)
+    return {
+      success: false,
+      data: [],
+      headers: [],
+      rowCount: 0,
+      error: `Erro ao processar arquivo: ${error.message}`,
+    }
+  }
 }
 
 // Export default com todas as funções
@@ -497,6 +409,5 @@ export default {
   parseFile,
   parseCSV,
   parseExcel,
-  validateFile,
   getFileExtension,
 }

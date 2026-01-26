@@ -93,7 +93,7 @@ export function validateCSRFToken(token, storedToken) {
 /**
  * Limita taxa de requisições (rate limiting simples)
  */
-class RateLimiter {
+export class RateLimiter {
   constructor(maxRequests = 10, windowMs = 60000) {
     this.maxRequests = maxRequests
     this.windowMs = windowMs
@@ -109,16 +109,32 @@ class RateLimiter {
     const now = Date.now()
     const userRequests = this.requests.get(identifier) || []
 
-    // Remover requisições antigas
-    const recentRequests = userRequests.filter(time => now - time < this.windowMs)
+    // Filtrar requisições dentro da janela de tempo
+    const recentRequests = userRequests.filter(
+      (timestamp) => now - timestamp < this.windowMs
+    )
 
+    // Atualizar lista de requisições
+    this.requests.set(identifier, recentRequests)
+
+    // Verificar se excedeu o limite
     if (recentRequests.length >= this.maxRequests) {
       return false
     }
 
+    // Adicionar nova requisição
     recentRequests.push(now)
     this.requests.set(identifier, recentRequests)
+
     return true
+  }
+
+  /**
+   * Reseta rate limit para um identificador
+   * @param {string} identifier - Identificador único
+   */
+  reset(identifier) {
+    this.requests.delete(identifier)
   }
 
   /**
@@ -126,21 +142,67 @@ class RateLimiter {
    */
   cleanup() {
     const now = Date.now()
-    for (const [identifier, requests] of this.requests.entries()) {
-      const recentRequests = requests.filter(time => now - time < this.windowMs)
-      if (recentRequests.length === 0) {
+    for (const [identifier, timestamps] of this.requests.entries()) {
+      const recent = timestamps.filter(
+        (timestamp) => now - timestamp < this.windowMs
+      )
+      if (recent.length === 0) {
         this.requests.delete(identifier)
       } else {
-        this.requests.set(identifier, recentRequests)
+        this.requests.set(identifier, recent)
       }
     }
   }
+
+  /**
+   * Obtém tempo até reset em segundos
+   * @param {string} identifier - Identificador único
+   * @returns {number} Tempo em segundos
+   */
+  getTimeUntilReset(identifier) {
+    const userRequests = this.requests.get(identifier) || []
+    if (userRequests.length === 0) return 0
+    
+    const oldestRequest = Math.min(...userRequests)
+    const timeElapsed = Date.now() - oldestRequest
+    const timeRemaining = Math.max(0, this.windowMs - timeElapsed)
+    
+    return Math.ceil(timeRemaining / 1000) // Retorna em segundos
+  }
+
+  /**
+   * Obtém número de requisições restantes
+   * @param {string} identifier - Identificador único
+   * @returns {number} Requisições restantes
+   */
+  getRemainingRequests(identifier) {
+    const now = Date.now()
+    const userRequests = this.requests.get(identifier) || []
+    
+    const recentRequests = userRequests.filter(
+      (timestamp) => now - timestamp < this.windowMs
+    )
+    
+    return Math.max(0, this.maxRequests - recentRequests.length)
+  }
 }
 
-// Instância global do rate limiter
+// Instâncias globais de rate limiters
+export const uploadRateLimiter = new RateLimiter(3, 60000) // 3 uploads por minuto
+export const processRateLimiter = new RateLimiter(5, 60000) // 5 processamentos por minuto
+export const exportRateLimiter = new RateLimiter(10, 60000) // 10 exports por minuto
+export const apiRateLimiter = new RateLimiter(30, 60000) // 30 chamadas API por minuto
+
+// Instância genérica (mantida para compatibilidade)
 export const rateLimiter = new RateLimiter(20, 60000) // 20 requisições por minuto
 
-// Limpar requisições antigas a cada 5 minutos
+// Cleanup automático a cada 5 minutos
 if (typeof window !== 'undefined') {
-  setInterval(() => rateLimiter.cleanup(), 5 * 60 * 1000)
+  setInterval(() => {
+    uploadRateLimiter.cleanup()
+    processRateLimiter.cleanup()
+    exportRateLimiter.cleanup()
+    apiRateLimiter.cleanup()
+    rateLimiter.cleanup()
+  }, 5 * 60 * 1000)
 }
