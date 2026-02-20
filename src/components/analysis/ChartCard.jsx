@@ -39,7 +39,7 @@ export default function ChartCard({
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex-1">
               {title && (
-                <div className="text-lg font-semibold text-primary-900 mb-1">
+                <div className="text-lg font-display font-semibold text-brand-primary-dark dark:text-white mb-1">
                   {typeof title === 'string' ? (
                     <h3>{title}</h3>
                   ) : (

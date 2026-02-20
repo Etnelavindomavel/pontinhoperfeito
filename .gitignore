@@ -54,3 +54,9 @@ ai-code-tracking.db
 # Repositórios embutidos
 PontoPerfeito/
 my-clerk-app/
+.env*.local
+
+# Dados de teste e temporários
+dados_teste_*.csv
+tabela_precos_*.csv
+marca-temp/

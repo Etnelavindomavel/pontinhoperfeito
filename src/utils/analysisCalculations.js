@@ -4,6 +4,7 @@
  */
 
 import { parseISO } from 'date-fns'
+import { AuditoriaProfissional } from './auditoriaAvancada'
 
 // ============================================================================
 // FORMATADORES
@@ -986,6 +987,8 @@ export function splitDataByPeriod(data, dateField) {
 
 /**
  * Calcula Curva ABC de Categorias com classificação ABCD
+ * IMPORTANTE: SEMPRE usa 50/25/15/10 (mesmo ao filtrar uma categoria específica).
+ * A parametrização 70/10/10/10 é APENAS para produtos (drill-down).
  * A: 50%, B: 25%, C: 15%, D: 10%
  * @param {Array} data - Array de dados
  * @param {string} categoryField - Nome do campo de categoria
@@ -999,7 +1002,6 @@ export function calculateABCCategories(data, categoryField, valueField) {
 
   // Agrupar por categoria e calcular total
   const grouped = groupBy(data, categoryField)
-  
   const categoryStats = Object.keys(grouped).map((category) => {
     const items = grouped[category]
     const value = sumBy(items, valueField)
@@ -1015,6 +1017,11 @@ export function calculateABCCategories(data, categoryField, valueField) {
     }
   })
 
+  if (categoryStats.length === 0) {
+    console.warn('Nenhuma categoria encontrada para análise ABC')
+    return []
+  }
+
   // Ordenar por valor (maior primeiro)
   categoryStats.sort((a, b) => b.value - a.value)
 
@@ -1027,7 +1034,7 @@ export function calculateABCCategories(data, categoryField, valueField) {
     accumulated += item.percentage
     item.accumulatedPercentage = accumulated
     
-    // Classificar: A=50%, B=25%, C=15%, D=10%
+    // SEMPRE 50/25/15/10 para categorias (não usar 70/10/10/10 aqui)
     if (accumulated <= 50) {
       item.class = 'A'
     } else if (accumulated <= 75) { // 50 + 25
@@ -1039,11 +1046,22 @@ export function calculateABCCategories(data, categoryField, valueField) {
     }
   })
 
-  return categoryStats
+  const auditoria = new AuditoriaProfissional()
+  const resultado = auditoria.validarCurvaABC(categoryStats, { A: 50, B: 25, C: 15, D: 10 })
+  if (!resultado.valido) {
+    console.warn('⚠️ Curva ABC de categorias teve correções aplicadas')
+  }
+  const itensCorrigidos = (resultado.itensCorrigidos || categoryStats).map(({ _original, ...item }) => ({
+    ...item,
+    accumulatedPercentage: item.accumulatedPercentage ?? item.accumulated,
+  }))
+  return itensCorrigidos
 }
 
 /**
  * Calcula Curva ABC de Produtos dentro de uma Categoria
+ * IMPORTANTE: SEMPRE usa 70/10/10/10 (apenas no drill-down de produtos).
+ * Categorias usam 50/25/15/10.
  * A: 70%, B: 10%, C: 10%, D: 10%
  * Identifica D Crítico (< 1% da categoria)
  * @param {Array} data - Array de dados
@@ -1051,9 +1069,10 @@ export function calculateABCCategories(data, categoryField, valueField) {
  * @param {string} valueField - Nome do campo de valor
  * @param {string} categoryField - Nome do campo de categoria (opcional)
  * @param {string} selectedCategory - Categoria selecionada (opcional)
- * @returns {Array} Array de { product: string, value: number, count: number, percentage: number, accumulatedPercentage: number, class: 'A'|'B'|'C'|'D', isCritical: boolean }
+ * @param {string} quantityField - Nome do campo de quantidade/unidades (opcional)
+ * @returns {Array} Array de { product, value, count, quantity, percentage, accumulatedPercentage, class, isCritical }
  */
-export function calculateABCProducts(data, productField, valueField, categoryField, selectedCategory) {
+export function calculateABCProducts(data, productField, valueField, categoryField, selectedCategory, quantityField) {
   if (!data || data.length === 0 || !productField || !valueField) {
     return []
   }
@@ -1068,18 +1087,20 @@ export function calculateABCProducts(data, productField, valueField, categoryFie
     return []
   }
 
-  // Agrupar por produto e calcular total
+  // Agrupar por produto e calcular total (valor e quantidade)
   const grouped = groupBy(filteredData, productField)
   
   const productStats = Object.keys(grouped).map((product) => {
     const items = grouped[product]
     const value = sumBy(items, valueField)
     const count = items.length
+    const quantity = quantityField ? sumBy(items, quantityField) : 0
     
     return {
       product,
       value,
       count,
+      quantity,
       percentage: 0,
       accumulatedPercentage: 0,
       class: '',
@@ -1099,7 +1120,7 @@ export function calculateABCProducts(data, productField, valueField, categoryFie
     accumulated += item.percentage
     item.accumulatedPercentage = accumulated
     
-    // Classificar: A=70%, B=10%, C=10%, D=10%
+    // SEMPRE 70/10/10/10 para produtos (não usar 50/25/15/10 aqui)
     if (accumulated <= 70) {
       item.class = 'A'
     } else if (accumulated <= 80) { // 70 + 10
@@ -1115,7 +1136,17 @@ export function calculateABCProducts(data, productField, valueField, categoryFie
     }
   })
 
-  return productStats
+  const auditoria = new AuditoriaProfissional()
+  const resultado = auditoria.validarCurvaABC(productStats, { A: 70, B: 10, C: 10, D: 10 })
+  if (!resultado.valido) {
+    console.warn('⚠️ Curva ABC de produtos teve correções aplicadas')
+  }
+  const itensCorrigidos = (resultado.itensCorrigidos || productStats).map(({ _original, ...item }) => ({
+    ...item,
+    accumulatedPercentage: item.accumulatedPercentage ?? item.accumulated,
+    isCritical: item.class === 'D' && (item.percentage ?? 0) < 1,
+  }))
+  return itensCorrigidos
 }
 
 /**

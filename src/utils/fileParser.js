@@ -218,7 +218,12 @@ export function parseExcel(file) {
       reader.onload = (e) => {
         try {
           const fileData = new Uint8Array(e.target.result)
-          const workbook = XLSX.read(fileData, { type: 'array' })
+          const workbook = XLSX.read(fileData, {
+            type: 'array',
+            cellDates: true,   // Converte datas Excel em objetos Date JS
+            cellNF: false,     // Não preservar formatação numérica
+            cellText: false,   // Não gerar texto formatado
+          })
 
           // Verificar se há sheets
           if (!workbook.SheetNames || workbook.SheetNames.length === 0) {

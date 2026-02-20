@@ -28,11 +28,11 @@ export default function Section({
     <div className={`mb-8 ${className}`}>
       {/* Header */}
       {(title || subtitle || actions) && (
-        <div className="mb-6 pb-4 border-b border-gray-200">
+        <div className="mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               {title && (
-                <h2 className="text-xl font-semibold text-primary-900 mb-1">
+                <h2 className="text-xl font-display font-bold text-brand-primary-dark dark:text-white mb-1">
                   {title}
                 </h2>
               )}

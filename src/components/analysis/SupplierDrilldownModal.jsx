@@ -11,7 +11,7 @@ import {
 } from 'recharts'
 import { formatCurrency, formatNumber, formatPercentage } from '@/utils/analysisCalculations'
 
-const COLORS = ['#14B8A6', '#0D9488', '#0F766E', '#115E59', '#134E4A', '#F97316', '#EA580C', '#C2410C']
+const COLORS = ['#0430BA', '#3549FC', '#FAD036', '#FBF409', '#10B981', '#EF4444']
 
 export default function SupplierDrilldownModal({
   isOpen,
@@ -41,7 +41,7 @@ export default function SupplierDrilldownModal({
       <div className="flex min-h-screen items-center justify-center p-4">
         <div className="relative bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden">
           {/* Header */}
-          <div className="bg-gradient-to-r from-primary to-secondary p-6 text-white">
+          <div className="bg-gradient-to-r from-brand-blue to-brand-blue-light p-6 text-white">
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <h2 className="text-2xl font-bold mb-2">

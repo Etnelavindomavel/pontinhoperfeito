@@ -1,5 +1,7 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useParams } from 'react-router-dom'
+import AppLayout from './components/layout/AppLayout'
 // import { lazy, Suspense } from 'react' // TEMPORARIAMENTE DESABILITADO PARA DIAGNÓSTICO
+import { ThemeProvider } from './contexts/ThemeContext'
 import { AuthProvider, useAuth } from './contexts/ClerkAuthContext'
 import { DataProvider } from './contexts/DataContext'
 import ErrorBoundary from './components/common/ErrorBoundary'
@@ -24,7 +26,14 @@ import Dashboard from './pages/Dashboard'
 import Analysis from './pages/Analysis'
 import Plans from './pages/Plans'
 import LandingEditor from './pages/admin/LandingEditor'
+import ProjecaoConfig from './pages/admin/ProjecaoConfig'
 import NotFound from './pages/NotFound'
+import Error404 from './pages/Error404'
+import Error500 from './pages/Error500'
+import ComponentShowcase from './pages/ComponentShowcase'
+import SimuladorAcoes from './pages/SimuladorAcoes'
+import GestaoHistorico from './pages/GestaoHistorico'
+import BrandLoader from './components/brand/BrandLoader'
 
 // Componente para proteger rotas autenticadas
 function ProtectedRoute({ children }) {
@@ -32,12 +41,7 @@ function ProtectedRoute({ children }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-secondary-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando...</p>
-        </div>
-      </div>
+      <BrandLoader fullScreen text="Carregando..." size="lg" />
     )
   }
 
@@ -50,12 +54,7 @@ function PublicRoute({ children }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-secondary-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando...</p>
-        </div>
-      </div>
+      <BrandLoader fullScreen text="Carregando..." size="lg" />
     )
   }
 
@@ -71,6 +70,12 @@ function PublicRoute({ children }) {
 //     </div>
 //   </div>
 // )
+
+/** Redireciona /analise/:type para /analysis/:type */
+function AnaliseRedirect() {
+  const { type } = useParams()
+  return <Navigate to={`/analysis/${type}`} replace />
+}
 
 function AppRoutes() {
   return (
@@ -96,55 +101,57 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/dashboard"
+        path="/"
         element={
           <ProtectedRoute>
-            <Dashboard />
+            <AppLayout />
           </ProtectedRoute>
         }
-      />
-      <Route
-        path="/analysis/:type"
-        element={
-          <ProtectedRoute>
-            <Analysis />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/plans"
-        element={
-          <ProtectedRoute>
-            <Plans />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/landing-editor"
-        element={
-          <AdminRoute>
-            <LandingEditor />
-          </AdminRoute>
-        }
-      />
-      <Route
-        path="*"
-        element={<NotFound />}
-      />
+      >
+        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="analysis/:type" element={<Analysis />} />
+        <Route path="plans" element={<Plans />} />
+        <Route path="simulador-acoes" element={<SimuladorAcoes />} />
+        <Route path="historico" element={<GestaoHistorico />} />
+        <Route
+          path="admin/landing-editor"
+          element={
+            <AdminRoute>
+              <LandingEditor />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="admin/projecao-config"
+          element={
+            <AdminRoute>
+              <ProjecaoConfig />
+            </AdminRoute>
+          }
+        />
+      </Route>
+      {/* Alias: /analise/:type redireciona para /analysis/:type */}
+      <Route path="/analise/:type" element={<AnaliseRedirect />} />
+      <Route path="/500" element={<Error500 />} />
+      <Route path="/showcase" element={<ComponentShowcase />} />
+      <Route path="*" element={<Error404 />} />
     </Routes>
   )
 }
 
 function App() {
   return (
-    <ErrorBoundary showDetails={import.meta.env.DEV}>
-      <AuthProvider>
-        <DataProvider>
-          <AppRoutes />
-          <InstallPWA />
-        </DataProvider>
-      </AuthProvider>
-    </ErrorBoundary>
+    <ThemeProvider>
+      <ErrorBoundary showDetails={import.meta.env.DEV}>
+        <AuthProvider>
+          <DataProvider>
+            <AppRoutes />
+            <InstallPWA />
+          </DataProvider>
+        </AuthProvider>
+      </ErrorBoundary>
+    </ThemeProvider>
   )
 }
 

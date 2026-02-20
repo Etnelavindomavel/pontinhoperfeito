@@ -49,23 +49,18 @@ import {
   cleanNumericValue,
 } from '@/utils/analysisCalculations'
 
-// Paleta de cores para gráficos
+// Paleta de cores para gráficos - Branding Ponto Perfeito oficial
 const COLORS = [
-  '#14B8A6',
+  '#0430BA',
+  '#3549FC',
+  '#FAD036',
+  '#FBF409',
+  '#10B981',
+  '#EF4444',
   '#0D9488',
-  '#0F766E',
-  '#115E59',
-  '#134E4A',
   '#F97316',
   '#EA580C',
-  '#C2410C',
-  '#9A3412',
-  '#7C2D12',
   '#3B82F6',
-  '#2563EB',
-  '#1D4ED8',
-  '#1E40AF',
-  '#1E3A8A',
 ]
 
 /**

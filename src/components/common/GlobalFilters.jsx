@@ -1,10 +1,11 @@
 import { useData } from '../../contexts/DataContext'
 import PeriodFilter from './PeriodFilter'
 import MultiSelect from './MultiSelect'
-import { Package, Tag } from 'lucide-react'
+import { Package, Tag, Filter, RotateCcw } from 'lucide-react'
 
 /**
  * Componente de filtros globais que combina período, fornecedor e categoria
+ * Redesenhado com branding oficial
  */
 export default function GlobalFilters() {
   const {
@@ -37,13 +38,30 @@ export default function GlobalFilters() {
   }
   
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+    <div className="bg-gradient-to-br from-white via-blue-50/30 to-yellow-50/20 dark:from-[#171717] dark:via-blue-950/10 dark:to-yellow-950/10 rounded-2xl shadow-sm border-2 border-gray-200 dark:border-[#404040] p-6 mb-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">Filtros Globais</h3>
+        <div className="flex items-center gap-3">
+          <div className="p-2 gradient-energy rounded-lg shadow-colored-blue">
+            <Filter className="text-white" size={18} />
+          </div>
+          <div>
+            <h3 className="font-heading font-bold text-base text-primary">Filtros Globais</h3>
+            {activeFiltersCount > 0 && (
+              <p className="text-xs text-secondary dark:text-tertiary font-body">
+                {activeFiltersCount} filtro{activeFiltersCount > 1 ? 's' : ''} ativo{activeFiltersCount > 1 ? 's' : ''}
+              </p>
+            )}
+          </div>
+        </div>
         {activeFiltersCount > 0 && (
-          <span className="px-3 py-1 bg-secondary-100 text-secondary-700 text-sm font-medium rounded-full">
-            {activeFiltersCount} {activeFiltersCount === 1 ? 'filtro ativo' : 'filtros ativos'}
-          </span>
+          <button
+            type="button"
+            onClick={handleClearAll}
+            className="text-[#3549FC] hover:text-[#0430BA] font-heading font-semibold flex items-center gap-1 text-sm transition-colors"
+          >
+            <RotateCcw size={14} />
+            Limpar
+          </button>
         )}
       </div>
       
@@ -85,19 +103,6 @@ export default function GlobalFilters() {
           </div>
         )}
       </div>
-      
-      {/* Botão limpar todos */}
-      {activeFiltersCount > 0 && (
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          <button
-            type="button"
-            onClick={handleClearAll}
-            className="text-sm text-red-600 hover:text-red-700 font-medium transition-colors"
-          >
-            Limpar todos os filtros
-          </button>
-        </div>
-      )}
     </div>
   )
 }

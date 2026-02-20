@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, lazy, Suspense } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft,
   TrendingUp,
   Package,
   Users,
@@ -10,13 +9,17 @@ import {
   Download,
   FileText,
   Database,
+  BarChart3,
+  ChevronRight,
 } from 'lucide-react'
 import { useData } from '@/contexts/DataContext'
 import { useAuth } from '@/contexts/ClerkAuthContext'
-import { Card, Button, GlobalFilters } from '@/components/common'
+import { Card, Button } from '@/components/common'
+import AnalysisFilterDrawer from '@/components/common/AnalysisFilterDrawer'
 import DownloadModelModal from '@/components/common/DownloadModelModal'
 import ExportPDFModal from '@/components/common/ExportPDFModal'
 import ErrorBoundary from '@/components/common/ErrorBoundary'
+import BrandLoader from '@/components/brand/BrandLoader'
 
 // Lazy loading de componentes de análise
 const FaturamentoAnalysis = lazy(() => import('@/components/analysis/FaturamentoAnalysis'))
@@ -24,6 +27,7 @@ const EstoqueAnalysis = lazy(() => import('@/components/analysis/EstoqueAnalysis
 const EquipeAnalysis = lazy(() => import('@/components/analysis/EquipeAnalysis'))
 const LayoutAnalysis = lazy(() => import('@/components/analysis/LayoutAnalysis'))
 const MarketingAnalysis = lazy(() => import('@/components/analysis/MarketingAnalysis'))
+const ExecutiveAnalysis = lazy(() => import('@/components/analysis/ExecutiveAnalysis'))
 import { 
   calculateTotalRevenue, 
   calculateAverageTicket,
@@ -76,6 +80,12 @@ function getAnalysisInfo(type) {
       icon: Megaphone,
       tabs: ['Checklist', 'Integração'],
     },
+    executiva: {
+      title: 'Visão Executiva',
+      description: 'Métricas estratégicas, base de clientes e indicadores de performance',
+      icon: BarChart3,
+      tabs: ['Overview'],
+    },
   }
   return info[type] || info.faturamento
 }
@@ -100,6 +110,8 @@ function getTabsForAnalysis(type) {
     ],
     estoque: [
       { id: 'overview', label: 'Visão Geral' },
+      { id: 'abc', label: 'Curva ABC' },
+      { id: 'giro', label: 'Giro de Estoque' },
       { id: 'ruptura', label: 'Ruptura' },
       { id: 'encalhados', label: 'Encalhados' },
     ],
@@ -115,6 +127,9 @@ function getTabsForAnalysis(type) {
     marketing: [
       { id: 'checklist', label: 'Checklist' },
       { id: 'integracao', label: 'Integração' },
+    ],
+    executiva: [
+      { id: 'overview', label: 'Visão Executiva' },
     ],
   }
   return tabs[type] || tabs.faturamento
@@ -136,8 +151,13 @@ export default function Analysis() {
     getDataDateRange,
     filterDataByPeriod,
     periodFilter,
+    setPeriodFilter,
     selectedSuppliers,
-    selectedCategories
+    setSelectedSuppliers,
+    selectedCategories,
+    setSelectedCategories,
+    getUniqueSuppliers,
+    getUniqueCategories,
   } = useData()
 
   // Obter informações da análise
@@ -336,14 +356,7 @@ export default function Analysis() {
   }, [rawData, mappedColumns, filterDataByPeriod, periodFilter, selectedSuppliers, selectedCategories, user])
 
   // Componente de loading específico para análises
-  const AnalysisLoader = () => (
-    <div className="flex items-center justify-center py-12">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-800 mx-auto mb-3"></div>
-        <p className="text-gray-600">Carregando análise...</p>
-      </div>
-    </div>
-  )
+  const AnalysisLoader = () => <BrandLoader size="lg" text="Carregando análise..." />
 
   /**
    * Renderizar conteúdo da análise baseado no tipo
@@ -354,7 +367,7 @@ export default function Analysis() {
         return (
           <ErrorBoundary>
             <Suspense fallback={<AnalysisLoader />}>
-              <FaturamentoAnalysis activeTab={activeTab} />
+              <FaturamentoAnalysis activeTab={activeTab} setActiveTab={setActiveTab} />
             </Suspense>
           </ErrorBoundary>
         )
@@ -395,136 +408,103 @@ export default function Analysis() {
           </ErrorBoundary>
         )
 
+      case 'executiva':
+        return (
+          <ErrorBoundary>
+            <Suspense fallback={<AnalysisLoader />}>
+              <ExecutiveAnalysis />
+            </Suspense>
+          </ErrorBoundary>
+        )
+
       default:
         return (
           <ErrorBoundary>
             <Suspense fallback={<AnalysisLoader />}>
-              <FaturamentoAnalysis activeTab={activeTab} />
+              <FaturamentoAnalysis activeTab={activeTab} setActiveTab={setActiveTab} />
             </Suspense>
           </ErrorBoundary>
         )
     }
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header fixo */}
-      <header className="bg-white shadow-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {/* Botão voltar e título */}
-          <div className="flex items-start gap-4 mb-4">
-            <button
-              onClick={handleGoBack}
-              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors flex-shrink-0"
-            >
-              <ArrowLeft size={20} />
-              <span className="hidden sm:inline">Voltar ao Dashboard</span>
-            </button>
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-lg bg-secondary-100 flex items-center justify-center">
-                  <IconComponent size={24} className="text-secondary-600" />
-                </div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-primary-900">
-                  {analysisInfo.title}
-                </h1>
-              </div>
-              <p className="text-sm text-gray-600 mb-4">
-                {analysisInfo.description}
-              </p>
+  const globalFiltersCount = (periodFilter !== 'all' ? 1 : 0) + (selectedSuppliers?.length || 0) + (selectedCategories?.length || 0)
 
-              {/* Informações do arquivo */}
+  return (
+    <div className="py-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Header compacto: breadcrumb | título | ações | filtros - DATA em destaque abaixo */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4 mb-4">
+            <nav className="flex items-center gap-1.5 text-sm text-neutral-600 dark:text-gray-400">
+              <button onClick={handleGoBack} className="hover:text-[#3549FC] transition-colors font-body">
+                Dashboard
+              </button>
+              <ChevronRight size={14} />
+              <span className="font-heading font-semibold text-neutral-900 dark:text-white truncate max-w-[180px] sm:max-w-none">
+                {analysisInfo.title}
+              </span>
               {fileName && (
-                <div className="mt-4 flex items-center space-x-4 text-sm text-gray-600">
-                  <div className="flex items-center space-x-2">
-                    <FileText size={16} />
-                    <span>{fileName}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Database size={16} />
-                    <span>{rawData.length} linhas de dados</span>
-                  </div>
-                </div>
+                <span className="text-neutral-500 dark:text-gray-500 text-xs hidden sm:inline">
+                  · {fileName}
+                </span>
               )}
+            </nav>
+            <div className="flex items-center gap-2 ml-auto flex-shrink-0">
+              {type !== 'executiva' && !isLoading && rawData.length > 0 && (
+                <AnalysisFilterDrawer
+                  activeCount={globalFiltersCount}
+                  periodFilter={periodFilter}
+                  setPeriodFilter={setPeriodFilter}
+                  selectedSuppliers={selectedSuppliers || []}
+                  setSelectedSuppliers={setSelectedSuppliers || (() => {})}
+                  selectedCategories={selectedCategories || []}
+                  setSelectedCategories={setSelectedCategories || (() => {})}
+                  getUniqueSuppliers={getUniqueSuppliers}
+                  getUniqueCategories={getUniqueCategories}
+                  getDataDateRange={getDataDateRange}
+                  rawData={rawData}
+                  mappedColumns={mappedColumns}
+                />
+              )}
+              <Button variant="outline" size="sm" onClick={handleDownloadTemplate} icon={FileText}>
+                Arquivo Modelo
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportPDF} icon={Download}>
+                Gerar Relatório
+              </Button>
             </div>
           </div>
-        </div>
-      </header>
 
-      {/* Área de conteúdo scrollável */}
-      <main className="flex-1 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Filtros Globais */}
-          {!isLoading && rawData.length > 0 && (
-            <GlobalFilters />
+          {/* Tabs de navegação - oculto para executiva */}
+          {type !== 'executiva' && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`
+                    px-4 py-2 rounded-xl font-display font-bold text-sm transition-all duration-200
+                    ${isActive
+                      ? 'bg-gradient-to-r from-brand-blue to-brand-blue-light text-white shadow-brand-lg scale-105'
+                      : 'bg-white dark:bg-gray-800 text-brand-blue dark:text-gray-300 border-2 border-gray-200 dark:border-gray-700 hover:border-brand-blue hover:scale-105 shadow-brand'
+                    }
+                  `}
+                >
+                  {tab.label}
+                </button>
+              )
+            })}
+          </div>
           )}
 
-          {/* Tabs de navegação */}
-          <div className="bg-white border-b border-gray-200 rounded-t-xl shadow-sm mb-6">
-            <div className="px-4 sm:px-6 lg:px-8">
-              <div className="flex space-x-1 overflow-x-auto">
-                {tabs.map((tab) => {
-                  const isActive = activeTab === tab.id
-
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`
-                        px-6 py-3 font-medium transition-all duration-200 whitespace-nowrap
-                        ${
-                          isActive
-                            ? 'bg-secondary-600 text-white rounded-t-lg shadow-sm'
-                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                        }
-                      `}
-                    >
-                      {tab.label}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-
           {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-secondary-600 mx-auto mb-4"></div>
-                <p className="text-gray-600">Carregando análise...</p>
-              </div>
-            </div>
+            <BrandLoader size="lg" text="Carregando análise..." />
           ) : (
             renderAnalysisContent()
           )}
-        </div>
-      </main>
-
-      {/* Footer com botões de ação */}
-      <footer className="bg-white border-t border-gray-200 shadow-lg sticky bottom-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row items-center justify-end space-x-4">
-            <Button
-              variant="outline"
-              size="md"
-              onClick={handleDownloadTemplate}
-              icon={FileText}
-              className="w-full sm:w-auto"
-            >
-              Baixar Arquivo Modelo
-            </Button>
-            <Button
-              variant="outline"
-              size="md"
-              onClick={handleExportPDF}
-              icon={Download}
-              className="w-full sm:w-auto"
-            >
-              Gerar Relatório
-            </Button>
-          </div>
-        </div>
-      </footer>
+      </div>
 
       {/* Modal de Download */}
       <DownloadModelModal

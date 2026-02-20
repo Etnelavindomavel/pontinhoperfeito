@@ -51,36 +51,36 @@ import {
   calculateStandardDeviation,
 } from '@/utils/analysisCalculations'
 
-// Paleta de cores para gráficos
+// Paleta de cores para gráficos - Branding Ponto Perfeito oficial
 const CHART_COLORS = [
-  '#14B8A6',
+  '#0430BA',
+  '#3549FC',
+  '#FAD036',
+  '#FBF409',
+  '#10B981',
+  '#EF4444',
   '#0D9488',
-  '#0F766E',
-  '#115E59',
-  '#134E4A',
   '#F97316',
-  '#EA580C',
-  '#C2410C',
 ]
 
-// Cores para ranking
+// Cores para ranking - Branding Ponto Perfeito
 const RANKING_COLORS = {
   first: {
-    bg: 'bg-yellow-100',
-    text: 'text-yellow-800',
-    border: 'border-yellow-300',
+    bg: 'bg-brand-mustard/20',
+    text: 'text-yellow-800 dark:text-brand-mustard',
+    border: 'border-brand-mustard',
     medal: '🥇',
   },
   second: {
-    bg: 'bg-gray-100',
-    text: 'text-gray-800',
-    border: 'border-gray-300',
+    bg: 'bg-brand-blue/10',
+    text: 'text-brand-blue dark:text-brand-blue-light',
+    border: 'border-brand-blue',
     medal: '🥈',
   },
   third: {
-    bg: 'bg-orange-100',
-    text: 'text-orange-800',
-    border: 'border-orange-300',
+    bg: 'bg-brand-yellow/20',
+    text: 'text-yellow-900 dark:text-brand-yellow',
+    border: 'border-brand-yellow',
     medal: '🥉',
   },
 }
@@ -907,9 +907,9 @@ export default function EquipeAnalysis({ activeTab = 'overview' }) {
                           type="monotone"
                           dataKey="value"
                           name="Faturamento"
-                          stroke="#14B8A6"
+                          stroke="#0430BA"
                           strokeWidth={2}
-                          dot={{ fill: '#14B8A6', r: 4 }}
+                          dot={{ fill: '#0430BA', r: 4 }}
                           activeDot={{ r: 6 }}
                         />
                       </LineChart>

@@ -10,6 +10,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/common'
+import BrandButton from '@/components/brand/BrandButton'
 import { useData } from '@/contexts/DataContext'
 import fileParser from '@/utils/fileParser'
 import LoadingOverlay from '@/components/common/LoadingOverlay'
@@ -370,21 +371,21 @@ export default function FileUpload({
         aria-busy={isProcessingCombined}
         aria-invalid={!!displayError}
         className={`
-          relative w-full rounded-xl min-h-64 p-6 sm:p-8 lg:p-10
+          relative w-full rounded-2xl min-h-64 p-6 sm:p-8 lg:p-10
           flex flex-col items-center justify-center
-          transition-all duration-300 cursor-pointer
+          transition-all duration-300
           ${
             currentState === 'dragging'
-              ? 'border-2 border-solid border-secondary-600 bg-secondary-50 scale-105'
+              ? 'border-2 border-solid border-[#3549FC] bg-blue-50 dark:bg-blue-950/20 scale-[1.02] shadow-colored-blue'
               : currentState === 'success'
-              ? 'border-2 border-solid border-success-500 bg-success-50'
+              ? 'border-2 border-solid border-green-500 dark:border-green-600 bg-green-50 dark:bg-green-950/20'
               : currentState === 'error' && !file
-              ? 'border-2 border-solid border-red-500 bg-red-50'
+              ? 'border-2 border-solid border-red-400 dark:border-red-600 bg-red-50 dark:bg-red-950/20'
               : currentState === 'processing'
-              ? 'border-2 border-solid border-secondary-600 bg-secondary-50'
+              ? 'border-2 border-solid border-[#3549FC] bg-blue-50 dark:bg-blue-950/20'
               : currentState === 'preview'
-              ? 'border-2 border-solid border-gray-300 bg-white'
-              : 'border-2 border-dashed border-gray-300 bg-gray-50 hover:border-secondary-400 hover:bg-gray-100'
+              ? 'border-2 border-solid border-gray-200 dark:border-[#404040] bg-white dark:bg-[#171717]'
+              : 'border-2 border-dashed border-gray-300 dark:border-[#404040] bg-white dark:bg-[#171717] hover:border-[#3549FC] hover:bg-blue-50/50 dark:hover:bg-blue-950/10'
           }
           ${isProcessingCombined || success ? 'cursor-default' : 'cursor-pointer'}
         `}
@@ -392,19 +393,17 @@ export default function FileUpload({
         {/* Estado: EMPTY */}
         {currentState === 'empty' && (
           <div className="flex flex-col items-center justify-center text-center space-y-4 animate-fade-in">
-            <Upload
-              size={64}
-              className="text-gray-400 animate-bounce"
-              style={{ animationDuration: '2s' }}
-            />
+            <div className="w-16 h-16 rounded-2xl gradient-energy shadow-colored-blue flex items-center justify-center">
+              <Upload size={28} className="text-white" />
+            </div>
             <div className="space-y-2">
-              <p className="text-lg font-semibold text-gray-700">
+              <p className="text-lg font-heading font-bold text-primary">
                 Arraste seu arquivo aqui
               </p>
-              <p className="text-base text-gray-600">
+              <p className="text-base text-secondary dark:text-tertiary font-body">
                 ou clique para selecionar
               </p>
-              <p className="text-sm text-gray-500 mt-4">
+              <p className="text-sm text-secondary dark:text-tertiary font-body mt-4">
                 Arquivos suportados: CSV, XLS, XLSX (máx. {formatFileSize(maxSize)})
               </p>
             </div>
@@ -414,11 +413,10 @@ export default function FileUpload({
         {/* Estado: DRAGGING */}
         {currentState === 'dragging' && (
           <div className="flex flex-col items-center justify-center text-center space-y-4 animate-fade-in">
-            <Download
-              size={64}
-              className="text-secondary-600 animate-pulse"
-            />
-            <p className="text-lg font-semibold text-secondary-700">
+            <div className="w-16 h-16 rounded-2xl gradient-insight shadow-colored-mustard flex items-center justify-center animate-pulse">
+              <Download size={28} className="text-white" />
+            </div>
+            <p className="text-lg font-heading font-bold text-[#3549FC]">
               Solte o arquivo aqui
             </p>
           </div>
@@ -426,28 +424,24 @@ export default function FileUpload({
 
         {/* Estado: PREVIEW */}
         {currentState === 'preview' && (
-          <div className="w-full space-y-4 animate-fade-in">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-gray-50 rounded-lg">
-              <div className="flex-shrink-0">
-                <div className="w-12 h-12 rounded-lg bg-secondary-100 flex items-center justify-center">
-                  <FileIcon size={24} className="text-secondary-600" />
-                </div>
+          <div className="w-full space-y-5 animate-fade-in">
+            {/* Info do arquivo */}
+            <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-blue-50 to-yellow-50 dark:from-blue-950/20 dark:to-yellow-950/10 rounded-xl border border-gray-200 dark:border-[#404040] text-left w-full">
+              <div className="w-12 h-12 rounded-xl gradient-energy shadow-colored-blue flex items-center justify-center flex-shrink-0">
+                <FileIcon size={22} className="text-white" />
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-900 truncate">
+              <div className="min-w-0 flex-1">
+                <p className="font-heading font-bold text-primary text-base truncate leading-tight">
                   {file.name}
                 </p>
-                <div className="flex flex-wrap gap-3 mt-1 text-sm text-gray-500">
-                  <span>{formatFileSize(file.size)}</span>
-                  <span>•</span>
-                  <span className="capitalize">
-                    {file.type || file.name.split('.').pop().toUpperCase()}
-                  </span>
-                </div>
+                <p className="text-sm text-secondary dark:text-tertiary font-body mt-0.5">
+                  {formatFileSize(file.size)} <span className="mx-1 opacity-50">•</span> <span className="capitalize">{file.type || file.name.split('.').pop().toUpperCase()}</span>
+                </p>
               </div>
             </div>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button
+            {/* Botões */}
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <BrandButton
                 variant="primary"
                 size="lg"
                 onClick={(e) => {
@@ -455,130 +449,115 @@ export default function FileUpload({
                   handleProcess()
                 }}
                 disabled={isProcessingCombined || isProcessLimited}
-                icon={CheckCircle}
-                className={`flex-1 sm:flex-none ${isProcessLimited ? 'opacity-50 cursor-not-allowed' : ''}`}
+                icon={<CheckCircle size={20} />}
+                className={isProcessLimited ? 'opacity-50 cursor-not-allowed' : ''}
               >
                 {isProcessLimited ? 'Aguarde...' : 'Processar Arquivo'}
-              </Button>
-              <Button
+              </BrandButton>
+              <BrandButton
                 variant="outline"
                 size="lg"
                 onClick={(e) => {
                   e.stopPropagation()
                   handleRemove()
                 }}
-                icon={X}
-                className="flex-1 sm:flex-none"
+                icon={<X size={20} />}
               >
                 Remover
-              </Button>
+              </BrandButton>
             </div>
           </div>
         )}
 
         {/* Estado: PROCESSING */}
         {currentState === 'processing' && (
-          <div className="w-full space-y-4 animate-fade-in">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-secondary-50 rounded-lg">
-              <div className="flex-shrink-0">
-                <div className="w-12 h-12 rounded-lg bg-secondary-100 flex items-center justify-center">
-                  <Loader2 size={24} className="text-secondary-600 animate-spin" />
-                </div>
+          <div className="w-full space-y-5 animate-fade-in">
+            <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-blue-50 to-yellow-50 dark:from-blue-950/20 dark:to-yellow-950/10 rounded-xl border border-gray-200 dark:border-[#404040] text-left w-full">
+              <div className="w-12 h-12 rounded-xl gradient-energy shadow-colored-blue flex items-center justify-center flex-shrink-0">
+                <Loader2 size={22} className="text-white animate-spin" />
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-900 truncate">
+              <div className="min-w-0 flex-1">
+                <p className="font-heading font-bold text-primary text-base truncate leading-tight">
                   {file.name}
                 </p>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-secondary dark:text-tertiary font-body mt-0.5">
                   Processando arquivo...
                 </p>
-                {/* Barra de progresso */}
-                <div className="mt-2 w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                  <div className="bg-secondary-600 h-2 rounded-full animate-progress" />
+                <div className="mt-2 w-full bg-gray-200 dark:bg-[#404040] rounded-full h-2 overflow-hidden">
+                  <div className="gradient-energy h-2 rounded-full animate-progress" />
                 </div>
               </div>
             </div>
-            <div className="flex gap-3">
-              <Button
-                variant="primary"
-                size="lg"
-                disabled
-                isLoading
-                className="flex-1 sm:flex-none"
-              >
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <BrandButton variant="primary" size="lg" disabled icon={<Loader2 size={20} className="animate-spin" />}>
                 Processando...
-              </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                disabled
-                className="flex-1 sm:flex-none"
-              >
+              </BrandButton>
+              <BrandButton variant="outline" size="lg" disabled icon={<X size={20} />}>
                 Remover
-              </Button>
+              </BrandButton>
             </div>
           </div>
         )}
 
         {/* Estado: SUCCESS */}
         {currentState === 'success' && (
-          <div className="w-full space-y-4 animate-fade-in text-center">
+          <div className="w-full space-y-5 animate-fade-in text-center">
             <div className="flex flex-col items-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-success-100 flex items-center justify-center">
-                <CheckCircle size={32} className="text-success-600" />
+              <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-950/50 flex items-center justify-center">
+                <CheckCircle size={32} className="text-green-600 dark:text-green-400" />
               </div>
               <div className="space-y-2">
-                <p className="text-lg font-semibold text-success-700">
+                <p className="text-lg font-heading font-bold text-green-800 dark:text-green-300">
                   Arquivo processado com sucesso!
                 </p>
                 {processedData && (
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-secondary dark:text-tertiary font-body">
                     {processedData.rows} linhas de dados carregadas
                   </p>
                 )}
               </div>
             </div>
-            <Button
+            <BrandButton
               variant="primary"
               size="lg"
               onClick={(e) => {
                 e.stopPropagation()
                 handleNewUpload()
               }}
-              className="w-full sm:w-auto"
+              icon={<Upload size={20} />}
             >
               Fazer novo upload
-            </Button>
+            </BrandButton>
           </div>
         )}
 
         {/* Estado: ERROR (sem arquivo) */}
         {currentState === 'error' && !file && (
-          <div className="w-full space-y-4 animate-fade-in text-center">
+          <div className="w-full space-y-5 animate-fade-in text-center">
             <div className="flex flex-col items-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
-                <AlertCircle size={32} className="text-red-600" />
+              <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-950/50 flex items-center justify-center">
+                <AlertCircle size={32} className="text-red-600 dark:text-red-400" />
               </div>
               <div className="space-y-2">
-                <p className="text-lg font-semibold text-red-700">
+                <p className="text-lg font-heading font-bold text-red-800 dark:text-red-300">
                   Erro ao processar arquivo
                 </p>
-                <p className="text-sm text-red-600" role="alert">
+                <p className="text-sm text-red-600 dark:text-red-400 font-body" role="alert">
                   {displayError}
                 </p>
               </div>
             </div>
-            <Button
+            <BrandButton
               variant="primary"
               size="lg"
               onClick={(e) => {
                 e.stopPropagation()
                 handleRetry()
               }}
-              className="w-full sm:w-auto"
+              icon={<Upload size={20} />}
             >
               Tentar novamente
-            </Button>
+            </BrandButton>
           </div>
         )}
       </div>

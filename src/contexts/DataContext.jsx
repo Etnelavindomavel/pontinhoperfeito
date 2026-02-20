@@ -14,6 +14,7 @@ import { dataService } from '../services/dataService'
 import { useAuth } from './ClerkAuthContext'
 import { setSecureItem, getSecureItem, removeSecureItem, clearAppStorage } from '@/utils/secureStorage'
 import { apiRateLimiter } from '@/utils/security'
+import SistemaAuditoria from '@/utils/auditoria'
 
 // Criação do contexto de dados
 const DataContext = createContext(undefined)
@@ -27,13 +28,26 @@ const STORAGE_KEY = 'pontoPerfeito_data'
  */
 const FIELD_VARIATIONS = {
   DATA: ['data', 'date', 'data_venda', 'data venda', 'dt_venda', 'dt venda', 'data_vend', 'data vend'],
-  VALOR: ['valor', 'preco', 'preço', 'total', 'vlr', 'price', 'amount', 'valor_total', 'valor total', 'preço_total', 'preco total'],
+  VALOR: ['valor', 'preco_venda', 'preço_venda', 'preco', 'preço', 'total', 'vlr', 'price', 'amount', 'valor_total', 'valor total', 'preço_total', 'preco total'],
   PRODUTO: ['produto', 'item', 'descricao', 'descrição', 'product', 'sku', 'nome_produto', 'nome produto', 'prod'],
   CATEGORIA: ['categoria', 'category', 'tipo', 'group', 'grupo', 'categ', 'cat'],
   FORNECEDOR: ['fornecedor', 'supplier', 'vendor', 'fabricante', 'forn', 'marca'],
   VENDEDOR: ['vendedor', 'vendedora', 'seller', 'atendente', 'consultor', 'vended', 'vendedor_nome', 'vendedor nome'],
   QUANTIDADE: ['quantidade', 'qtd', 'qty', 'quantity', 'unidades', 'qnt', 'qtde'],
   ESTOQUE: ['estoque', 'stock', 'saldo', 'disponivel', 'disponível', 'qtd_estoque', 'qtd estoque'],
+  // Campos financeiros adicionais (Visão Executiva)
+  CNPJ: ['cnpj', 'cpf_cnpj', 'documento', 'doc', 'cnpj_cliente'],
+  CLIENTE: ['cliente', 'nome_cliente', 'razao_social', 'customer', 'client'],
+  PRECO_VENDA: ['preco_venda', 'preço_venda', 'preco', 'preço', 'valor_unitario', 'price'],
+  VALOR_ST: ['valor_st', 'st', 'icms_st', 'substituicao_tributaria'],
+  ALIQUOTA_SAIDA: ['aliquota_saida', 'aliquota', 'imposto_saida', 'tax', 'taxa'],
+  CMV_LIQUIDO: ['cmv_liquido', 'cmv', 'custo', 'custo_unitario', 'valor_custo', 'cost'],
+  PERCENTUAL_COMISSAO: ['percentual_comissao', 'comissao_percentual', 'perc_comissao', 'comissao'],
+  OUTRAS_DESPESAS: ['outras_despesas', 'despesa', 'valor_despesa', 'frete', 'marketing', 'despesas_adicionais'],
+  BONIFICACAO: ['bonificacao', 'credito_bonificacao', 'recomposicao_margem', 'credito', 'desconto_adicional'],
+  REGIAO: ['regiao', 'região', 'region', 'area'],
+  GERENTE: ['gerente', 'nome_gerente', 'supervisor', 'gestor', 'manager'],
+  UF: ['uf', 'estado', 'state', 'sigla_uf'],
 }
 
 /**
@@ -120,6 +134,13 @@ function determineAvailableAnalysis(mappedColumns) {
   
   // Marketing: sempre disponível (análise manual)
   availableAnalysis.push('marketing')
+
+  // Executiva: disponível quando tem dados de valor ou campos financeiros completos
+  const hasPrecoVenda = !!mappedColumns.preco_venda
+  const hasCMV = !!mappedColumns.cmv_liquido
+  if (hasValor || hasPrecoVenda || (hasProduto && hasQuantidade)) {
+    availableAnalysis.push('executiva')
+  }
   
   return availableAnalysis
 }
@@ -381,8 +402,8 @@ export function DataProvider({ children }) {
 
     let data = rawData
 
-    // Aplicar filtros de período
-    if (mappedColumns.data && periodFilter !== 'all') {
+    // Aplicar filtros de período (exceto 'custom', que é aplicado no componente com date range)
+    if (mappedColumns.data && periodFilter !== 'all' && periodFilter !== 'custom') {
       data = filterDataByPeriod(data, mappedColumns.data)
     }
 
@@ -483,11 +504,19 @@ export function DataProvider({ children }) {
       data.forEach((item) => {
         try {
           const dateStr = item[fieldToUse]
-          if (!dateStr) return
+          if (!dateStr && dateStr !== 0) return
 
           let date
           if (dateStr instanceof Date) {
             date = dateStr
+          } else if (typeof dateStr === 'number') {
+            // Serial date do Excel (dias desde 30/12/1899)
+            if (dateStr >= 1 && dateStr <= 2958465) {
+              const excelEpoch = new Date(Date.UTC(1899, 11, 30))
+              date = new Date(excelEpoch.getTime() + dateStr * 86400000)
+            } else {
+              date = new Date(dateStr)
+            }
           } else if (typeof dateStr === 'string') {
             date = parseISO(dateStr)
             if (!isValid(date)) {
@@ -543,6 +572,9 @@ export function DataProvider({ children }) {
       case 'year':
       case 'all':
         newGroupByPeriod = 'month'
+        break
+      case 'custom':
+        newGroupByPeriod = 'day'
         break
       default:
         newGroupByPeriod = 'day'
@@ -707,13 +739,21 @@ export function DataProvider({ children }) {
         if (startDate) {
           filtered = filtered.filter((row) => {
             const dateValue = row[dateField]
-            if (!dateValue) return false
+            if (!dateValue && dateValue !== 0) return false
 
             try {
               // Tentar parsear data em vários formatos
               let date
               if (dateValue instanceof Date) {
                 date = dateValue
+              } else if (typeof dateValue === 'number') {
+                // Serial date do Excel (dias desde 30/12/1899)
+                if (dateValue >= 1 && dateValue <= 2958465) {
+                  const excelEpoch = new Date(Date.UTC(1899, 11, 30))
+                  date = new Date(excelEpoch.getTime() + dateValue * 86400000)
+                } else {
+                  date = new Date(dateValue)
+                }
               } else if (typeof dateValue === 'string') {
                 // Tentar formatos comuns
                 date = parseISO(dateValue)
@@ -787,13 +827,21 @@ export function DataProvider({ children }) {
         const dateValue = row[dateField]
         const value = cleanNumericValue(row[valueField])
 
-        if (!dateValue || value === 0) return
+        if ((!dateValue && dateValue !== 0) || value === 0) return
 
         try {
           // Parsear data
           let date
           if (dateValue instanceof Date) {
             date = dateValue
+          } else if (typeof dateValue === 'number') {
+            // Serial date do Excel
+            if (dateValue >= 1 && dateValue <= 2958465) {
+              const excelEpoch = new Date(Date.UTC(1899, 11, 30))
+              date = new Date(excelEpoch.getTime() + dateValue * 86400000)
+            } else {
+              date = new Date(dateValue)
+            }
           } else if (typeof dateValue === 'string') {
             date = parseISO(dateValue)
             if (!isValid(date)) {
@@ -939,6 +987,11 @@ export function DataProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
 
+  const runSystemAudit = () => {
+    const auditoria = new SistemaAuditoria()
+    return auditoria.executar({ faturamento: state.rawData || [] })
+  }
+
   const value = {
     ...state,
     periodFilter,
@@ -963,6 +1016,7 @@ export function DataProvider({ children }) {
     removeFilter,
     clearAllFilters,
     applyActiveFilters,
+    runSystemAudit,
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

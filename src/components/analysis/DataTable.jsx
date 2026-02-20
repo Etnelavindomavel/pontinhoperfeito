@@ -227,12 +227,12 @@ export default function DataTable({
         {(exportable || title) && (
           <div className="flex items-center justify-between mb-3">
             {title && (
-              <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
+              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">{title}</h3>
             )}
           </div>
         )}
         <div className="text-center py-12">
-          <p className="text-gray-500">{emptyMessage}</p>
+          <p className="text-gray-600 dark:text-gray-400">{emptyMessage}</p>
         </div>
       </div>
     )
@@ -244,7 +244,7 @@ export default function DataTable({
       {(exportable || title) && (
         <div className="flex items-center justify-between mb-3">
           {title && (
-            <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
+            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">{title}</h3>
           )}
           {exportable && (
             <button
@@ -262,14 +262,14 @@ export default function DataTable({
       {/* Tabela */}
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-gray-100">
+          <thead className="bg-gray-100 dark:bg-gray-900">
             <tr>
               {columns.map((column) => (
                 <th
                   key={column.key}
                   className={`
-                    px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider
-                    ${sortable ? 'cursor-pointer hover:bg-gray-200' : ''}
+                    px-4 py-3 text-left text-xs font-semibold text-gray-800 dark:text-gray-200 uppercase tracking-wider
+                    ${sortable ? 'cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-800' : ''}
                     transition-colors duration-200
                   `}
                   onClick={() => handleSort(column.key)}
@@ -282,10 +282,10 @@ export default function DataTable({
               ))}
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
             {displayData.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={columns.length} className="px-4 py-8 text-center text-gray-600 dark:text-gray-400">
                   {emptyMessage}
                 </td>
               </tr>
@@ -296,8 +296,8 @@ export default function DataTable({
                   <tr
                     key={rowIndex}
                     className={`
-                      ${rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
-                      hover:bg-gray-100 transition-colors duration-150
+                      ${rowIndex % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-700/50'}
+                      hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150
                       ${customRowClass}
                       ${onRowClick ? 'cursor-pointer' : ''}
                     `}
@@ -306,7 +306,7 @@ export default function DataTable({
                   {columns.map((column) => (
                     <td
                       key={column.key}
-                      className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap"
+                      className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 whitespace-nowrap"
                     >
                       {renderCell(column, row)}
                     </td>
